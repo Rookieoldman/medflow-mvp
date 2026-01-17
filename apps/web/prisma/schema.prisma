@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  role              Role
+  transfersAssigned Transfer[] @relation("AssignedTransfers")
+  transfersCreated  Transfer[] @relation("CreatedTransfers")
+  incidentsCreated  Incident[] @relation("IncidentsCreated")
+  createdAt         DateTime   @default(now())
+}
+
+model Transfer {
+  id              String         @id @default(cuid())
+  origin          String
+  destination     String
+  priority        Priority       @default(NORMAL)
+  status          TransferStatus @default(SOLICITADO)
+  previousStatus  TransferStatus?
+
+  createdById     String
+  createdBy       User           @relation("CreatedTransfers", fields: [createdById], references: [id])
+
+  assignedToId    String?
+  assignedTo      User?          @relation("AssignedTransfers", fields: [assignedToId], references: [id])
+
+  incidents       Incident[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+
+model Incident {
+  id           String   @id @default(cuid())
+  transferId   String
+  transfer     Transfer @relation(fields: [transferId], references: [id])
+
+  type         IncidentType
+  note         String?
+
+  createdById  String?
+  createdBy    User?    @relation("IncidentsCreated", fields: [createdById], references: [id])
+
+  createdAt    DateTime @default(now())
+}
+
+enum Role {
+  TECNICO
+  CELADOR
+  ADMIN
+}
+
+enum Priority {
+  NORMAL
+  URGENTE
+}
+
+enum TransferStatus {
+  SOLICITADO
+  ASIGNADO
+  EN_CURSO
+  EN_CAMINO_PRUEBA
+  EN_ESPERA
+  EN_LA_PRUEBA
+  VUELTA
+  FINALIZADO
+  PAUSADO
+}
+
+enum IncidentType {
+  PACIENTE_NO_PREPARADO
+  ESPERA_CLINICA
+  PRUEBA_CANCELADA
+  OTRO
+}

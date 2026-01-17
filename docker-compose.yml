@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: medflow
+      POSTGRES_PASSWORD: medflow
+      POSTGRES_DB: medflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      DATABASE_URL: postgresql://medflow:medflow@db:5432/medflow?schema=public
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  pgdata:
