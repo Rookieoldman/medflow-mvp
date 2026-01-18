@@ -11,17 +11,23 @@ model User {
   id                String     @id @default(cuid())
   email             String     @unique
   role              Role
+
   transfersAssigned Transfer[] @relation("AssignedTransfers")
   transfersCreated  Transfer[] @relation("CreatedTransfers")
   incidentsCreated  Incident[] @relation("IncidentsCreated")
+
+  transferAcceptances TransferAcceptance[]
+
   createdAt         DateTime   @default(now())
 }
 
 model Transfer {
   id              String         @id @default(cuid())
+
   priority        Priority       @default(NORMAL)
   status          TransferStatus @default(SOLICITADO)
   previousStatus  TransferStatus?
+
   mrn             String
   patientFullName String
   dob             DateTime
@@ -34,14 +40,33 @@ model Transfer {
   assignedToId    String?
   assignedTo      User?          @relation("AssignedTransfers", fields: [assignedToId], references: [id])
 
+  acceptance      TransferAcceptance?
+
   incidents       Incident[]
+
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
 
+model TransferAcceptance {
+  id            String   @id @default(cuid())
+
+  transferId    String   @unique
+  transfer      Transfer @relation(fields: [transferId], references: [id])
+
+  signerName    String
+  signerRole    String?
+  signatureData String
+
+  celadorId     String
+  celador       User     @relation(fields: [celadorId], references: [id])
+
+  signedAt      DateTime @default(now())
+}
 
 model Incident {
   id           String   @id @default(cuid())
+
   transferId   String
   transfer     Transfer @relation(fields: [transferId], references: [id])
 
@@ -84,6 +109,7 @@ enum IncidentType {
   PRUEBA_CANCELADA
   OTRO
 }
+
 enum TestType {
   RM
   ECO
