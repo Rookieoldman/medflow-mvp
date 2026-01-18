@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { assignToMe, setStatus, pauseTransfer, resumeTransfer } from "./serverActions";
-import { acceptTransfer } from "./serverActions";
+import {
+  assignToMe,
+  setStatus,
+  pauseTransfer,
+  resumeTransfer,
+  acceptTransfer,
+} from "./serverActions";
 
 import SignatureModal from "@/components/SignatureModal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { initials } from "@/lib/patient";
+import ElapsedTime from "@/components/ElapsedTime";
 
 type Transfer = {
   id: string;
@@ -19,6 +25,7 @@ type Transfer = {
   testType: string;
   priority: string;
   status: string;
+  createdAt: string;
   acceptance?: unknown;
 };
 
@@ -27,10 +34,7 @@ type Props = {
   mine?: Transfer[];
 };
 
-export default function CeladorClient({
-  available = [],
-  mine = [],
-}: Props) {
+export default function CeladorClient({ available = [], mine = [] }: Props) {
   const [openSignature, setOpenSignature] = useState<string | null>(null);
 
   return (
@@ -48,16 +52,24 @@ export default function CeladorClient({
             {available.map((t) => (
               <div
                 key={t.id}
-                className="border rounded p-4 flex items-center justify-between"
+                className="relative border rounded p-4 flex items-center justify-between"
               >
+                {/* ⏱️ TIMER */}
+                <div className="absolute top-2 right-2">
+                  <ElapsedTime createdAt={t.createdAt} />
+                </div>
+
                 <div className="space-y-1">
                   <div className="font-mono text-sm">{t.mrn}</div>
+
                   <div className="text-2xl font-semibold">
                     {initials(t.patientFullName)}
                   </div>
+
                   <div className="text-sm text-gray-600">
                     {t.location} → {t.testType}
                   </div>
+
                   <div className="flex gap-2">
                     <PriorityBadge priority={t.priority} />
                     <StatusBadge status={t.status} />
@@ -86,23 +98,29 @@ export default function CeladorClient({
         <h2 className="text-lg font-semibold">Mis traslados</h2>
 
         {mine.length === 0 ? (
-          <p className="text-sm text-gray-600">
-            No tienes traslados activos.
-          </p>
+          <p className="text-sm text-gray-600">No tienes traslados activos.</p>
         ) : (
           <div className="space-y-4">
             {mine.map((t) => (
-              <div key={t.id} className="border rounded p-4 space-y-4">
+              <div key={t.id} className="relative border rounded p-4 space-y-4">
+                {/* ⏱️ TIMER */}
+                <div className="absolute top-2 right-2">
+                  <ElapsedTime createdAt={t.createdAt} />
+                </div>
+
                 {/* INFO */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <div className="font-mono text-sm">{t.mrn}</div>
+
                     <div className="text-2xl font-semibold">
                       {initials(t.patientFullName)}
                     </div>
+
                     <div className="text-sm text-gray-600">
                       {t.location} → {t.testType}
                     </div>
+
                     <div className="flex gap-2">
                       <PriorityBadge priority={t.priority} />
                       <StatusBadge status={t.status} />
@@ -116,8 +134,8 @@ export default function CeladorClient({
                   </div>
 
                   <Link
-                    href={`/transfer/${t.id}`}
-                    className="underline text-sm"
+                    href={`/celador/transfer/${t.id}`}
+                    className="underline text-sm self-end"
                   >
                     Ver
                   </Link>
@@ -157,23 +175,13 @@ export default function CeladorClient({
                     <>
                       <form action={setStatus}>
                         <input type="hidden" name="transferId" value={t.id} />
-                        <input
-                          type="hidden"
-                          name="next"
-                          value="EN_ESPERA"
-                        />
-                        <button className="border px-3 py-2">
-                          En espera
-                        </button>
+                        <input type="hidden" name="next" value="EN_ESPERA" />
+                        <button className="border px-3 py-2">En espera</button>
                       </form>
 
                       <form action={setStatus}>
                         <input type="hidden" name="transferId" value={t.id} />
-                        <input
-                          type="hidden"
-                          name="next"
-                          value="EN_LA_PRUEBA"
-                        />
+                        <input type="hidden" name="next" value="EN_LA_PRUEBA" />
                         <button className="border px-3 py-2">
                           En la prueba
                         </button>
@@ -185,14 +193,8 @@ export default function CeladorClient({
                   {t.status === "EN_ESPERA" && (
                     <form action={setStatus}>
                       <input type="hidden" name="transferId" value={t.id} />
-                      <input
-                        type="hidden"
-                        name="next"
-                        value="EN_LA_PRUEBA"
-                      />
-                      <button className="border px-3 py-2">
-                        En la prueba
-                      </button>
+                      <input type="hidden" name="next" value="EN_LA_PRUEBA" />
+                      <button className="border px-3 py-2">En la prueba</button>
                     </form>
                   )}
 
@@ -211,14 +213,8 @@ export default function CeladorClient({
                   {t.status === "VUELTA" && (
                     <form action={setStatus}>
                       <input type="hidden" name="transferId" value={t.id} />
-                      <input
-                        type="hidden"
-                        name="next"
-                        value="FINALIZADO"
-                      />
-                      <button className="border px-3 py-2">
-                        Finalizar
-                      </button>
+                      <input type="hidden" name="next" value="FINALIZADO" />
+                      <button className="border px-3 py-2">Finalizar</button>
                     </form>
                   )}
 
@@ -226,18 +222,20 @@ export default function CeladorClient({
                   {t.status !== "PAUSADO" ? (
                     <form action={pauseTransfer}>
                       <input type="hidden" name="transferId" value={t.id} />
-                      <button className="border px-3 py-2">
-                        Pausar
-                      </button>
+                      <button className="border px-3 py-2">Pausar</button>
                     </form>
                   ) : (
                     <form action={resumeTransfer}>
                       <input type="hidden" name="transferId" value={t.id} />
-                      <button className="border px-3 py-2">
-                        Reanudar
-                      </button>
+                      <button className="border px-3 py-2">Reanudar</button>
                     </form>
                   )}
+                  <Link
+                    className="border px-3 py-2"
+                    href={`/celador/incidencia/${t.id}`}
+                  >
+                    Registrar incidencia
+                  </Link>
                 </div>
               </div>
             ))}

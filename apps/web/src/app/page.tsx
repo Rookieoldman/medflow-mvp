@@ -4,7 +4,7 @@ import { createTransfer } from "./actions/createTransfer";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { initials } from "@/lib/patient";
-
+import ElapsedTime from "@/components/ElapsedTime";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
@@ -52,36 +52,35 @@ export default async function TecnicoPage() {
             <input
               name="mrn"
               placeholder="Nº historia"
-              className="border p-2 w-full"
+              className="border rounded p-2 w-full"
             />
 
             <input
               name="lastName1"
               placeholder="1er apellido"
-              className="border p-2 w-full"
+              className="border rounded p-2 w-full"
             />
 
             <input
               name="lastName2"
               placeholder="2º apellido"
-              className="border p-2 w-full"
+              className="border rounded p-2 w-full"
             />
 
             <input
               name="firstName"
               placeholder="Nombre"
-              className="border p-2 w-full"
+              className="border rounded p-2 w-full"
             />
 
-            <input name="dob" type="date" className="border p-2 w-full" />
-
+            <input name="dob" type="date" className="border rounded p-2 w-full" />
             <input
               name="location"
               placeholder="Ubicación (ej. UCI 3)"
-              className="border p-2 w-full"
+              className="border p-2 w-full rounded"
             />
 
-            <select name="testType" className="border p-2 w-full">
+            <select name="testType" className="border p-2 w-full rounded">
               <option value="RX">RX</option>
               <option value="RM">RM</option>
               <option value="ECO">ECO</option>
@@ -91,17 +90,14 @@ export default async function TecnicoPage() {
 
             <select
               name="priority"
-              className="border p-2 w-full"
+              className="border p-2 w-full rounded"
               defaultValue="NORMAL"
             >
               <option value="NORMAL">Normal</option>
               <option value="URGENTE">Urgente</option>
             </select>
 
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2"
-            >
+            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
               Solicitar traslado
             </button>
           </form>
@@ -112,9 +108,7 @@ export default async function TecnicoPage() {
           <h2 className="text-lg font-semibold">Mis solicitudes</h2>
 
           {transfers.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              Aún no hay solicitudes.
-            </p>
+            <p className="text-sm text-gray-600">Aún no hay solicitudes.</p>
           ) : (
             <div className="space-y-3">
               {transfers.map((t) => (
@@ -139,6 +133,9 @@ export default async function TecnicoPage() {
                       <PriorityBadge priority={t.priority} />
                       <StatusBadge status={t.status} />
                     </div>
+                  </div>
+                  <div className=" top-2 right-2">
+                    <ElapsedTime createdAt={t.createdAt} />
                   </div>
 
                   <div className="flex items-center">
