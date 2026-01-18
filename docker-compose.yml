@@ -17,6 +17,9 @@ services:
       target: dev
     environment:
       DATABASE_URL: postgresql://medflow:medflow@db:5432/medflow?schema=public
+      NEXTAUTH_SECRET: super-secret-medflow-dev
+      NEXTAUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: true
     ports:
       - "3000:3000"
     depends_on:

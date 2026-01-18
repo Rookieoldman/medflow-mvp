@@ -2,55 +2,30 @@
 
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDevCelador } from "@/lib/devUser";
-import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
-export async function acceptTransfer(formData: FormData) {
-  const transferId = String(formData.get("transferId") ?? "");
-  const signerName = String(formData.get("signerName") ?? "").trim();
-  const signerRole = String(formData.get("signerRole") ?? "").trim();
-  const signatureData = String(formData.get("signatureData") ?? "");
+export async function createIncident(formData: FormData) {
+    const transferId = String(formData.get("transferId") ?? "");
+    const type = String(formData.get("type") ?? "OTRO");
+    const note = String(formData.get("note") ?? "").trim();
 
-  if (!transferId || !signerName || !signatureData) {
-    throw new Error("Datos de firma incompletos");
-  }
+    const celador = await getOrCreateDevCelador();
 
-  const celador = await getOrCreateDevCelador();
+    const t = await prisma.transfer.findUnique({ where: { id: transferId } });
+    if (!t) throw new Error("Traslado no encontrado");
 
-  const transfer = await prisma.transfer.findUnique({
-    where: { id: transferId },
-    include: { acceptance: true },
-  });
+    if (t.assignedToId && t.assignedToId !== celador.id) {
+        throw new Error("No puedes registrar incidencias en un traslado de otro celador");
+    }
 
-  if (!transfer) throw new Error("Traslado no encontrado");
+    await prisma.incident.create({
+        data: {
+            transferId,
+            type: type as any,
+            note: note || null,
+            createdById: celador.id,
+        },
+    });
 
-  if (transfer.acceptance) {
-    throw new Error("Este traslado ya fue aceptado");
-  }
-
-  if (transfer.status !== "ASIGNADO") {
-    throw new Error("El traslado no está en estado ASIGNADO");
-  }
-
-  await prisma.$transaction([
-    prisma.transferAcceptance.create({
-      data: {
-        transferId,
-        signerName,
-        signerRole: signerRole || null,
-        signatureData,
-        celadorId: celador.id,
-      },
-    }),
-
-    prisma.transfer.update({
-      where: { id: transferId },
-      data: {
-        status: "EN_CURSO",
-        previousStatus: "ASIGNADO",
-      },
-    }),
-  ]);
-
-  revalidatePath("/celador");
-  revalidatePath(`/transfer/${transferId}`);
+    redirect(`/transfer/${transferId}`);
 }
