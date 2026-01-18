@@ -19,11 +19,14 @@ model User {
 
 model Transfer {
   id              String         @id @default(cuid())
-  origin          String
-  destination     String
   priority        Priority       @default(NORMAL)
   status          TransferStatus @default(SOLICITADO)
   previousStatus  TransferStatus?
+  mrn             String
+  patientFullName String
+  dob             DateTime
+  location        String
+  testType        TestType
 
   createdById     String
   createdBy       User           @relation("CreatedTransfers", fields: [createdById], references: [id])
@@ -80,4 +83,11 @@ enum IncidentType {
   ESPERA_CLINICA
   PRUEBA_CANCELADA
   OTRO
+}
+enum TestType {
+  RM
+  ECO
+  RX
+  MEDICINA_NUCLEAR
+  TC
 }
