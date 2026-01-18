@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getOrCreateDevCelador } from "@/lib/devUser";
 
 export async function markEnLaPrueba(formData: FormData) {
   const transferId = String(formData.get("transferId") ?? "");
@@ -26,5 +27,43 @@ export async function markEnLaPrueba(formData: FormData) {
     data: { status: "EN_LA_PRUEBA" },
   });
 
+  revalidatePath(`/transfer/${transferId}`);
+}
+export async function cancelPrueba(formData: FormData) {
+  const transferId = String(formData.get("transferId") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!transferId) throw new Error("Falta transferId");
+
+  // En el MVP usamos el celador dev como “actor” que cancela
+  const actor = await getOrCreateDevCelador();
+
+  const t = await prisma.transfer.findUnique({ where: { id: transferId } });
+  if (!t) throw new Error("Traslado no encontrado");
+  if (t.status === "FINALIZADO") return;
+
+  // Si quieres restringir: solo el celador asignado puede cancelar
+  if (t.assignedToId && t.assignedToId !== actor.id) {
+    throw new Error("No puedes cancelar una prueba de un traslado asignado a otro celador");
+  }
+
+  await prisma.$transaction([
+    prisma.incident.create({
+      data: {
+        transferId,
+        type: "PRUEBA_CANCELADA",
+        note: note || "Prueba cancelada",
+        createdById: actor.id,
+      },
+    }),
+    prisma.transfer.update({
+      where: { id: transferId },
+      data: {
+        status: "CANCELADO",
+      },
+    }),
+  ]);
+
+  revalidatePath("/celador");
   revalidatePath(`/transfer/${transferId}`);
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { markEnLaPrueba } from "./serverActions";
+import { markEnLaPrueba, cancelPrueba } from "./serverActions";
+import CancelPruebaButton from "./CancelPruebaButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -7,7 +8,6 @@ export const revalidate = 0;
 export default async function TransferDetail({
   params,
 }: {
-  // Next 16 + Turbopack: params puede llegar como Promise
   params: Promise<{ id: string }> | { id: string };
 }) {
   const resolvedParams = await Promise.resolve(params as any);
@@ -26,6 +26,13 @@ export default async function TransferDetail({
 
   const canMarkEnLaPrueba =
     transfer.status === "EN_CAMINO_PRUEBA" || transfer.status === "EN_ESPERA";
+
+  const canCancel =
+    transfer.status === "ASIGNADO" ||
+    transfer.status === "EN_CURSO" ||
+    transfer.status === "EN_CAMINO_PRUEBA" ||
+    transfer.status === "EN_ESPERA" ||
+    transfer.status === "EN_LA_PRUEBA";
 
   return (
     <main className="p-6 space-y-6">
@@ -50,6 +57,10 @@ export default async function TransferDetail({
             Marcar “En la prueba”
           </button>
         </form>
+      )}
+
+      {canCancel && (
+        <CancelPruebaButton transferId={transfer.id} action={cancelPrueba} />
       )}
 
       <section className="space-y-2">

@@ -3,11 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateDevCelador } from "@/lib/devUser";
 import {
   assignToMe,
-  nextStatus,
+  setStatus,
   pauseTransfer,
   resumeTransfer,
 } from "./serverActions";
-
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -105,13 +104,82 @@ export default async function CeladorPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <form action={nextStatus}>
-                    <input type="hidden" name="transferId" value={t.id} />
-                    <button className="border px-3 py-2" type="submit">
-                      Siguiente estado
-                    </button>
-                  </form>
+                  {/* Botones según estado */}
+                  {t.status === "ASIGNADO" && (
+                    <form action={setStatus}>
+                      <input type="hidden" name="transferId" value={t.id} />
+                      <input type="hidden" name="next" value="EN_CURSO" />
+                      <button className="border px-3 py-2" type="submit">
+                        Iniciar traslado
+                      </button>
+                    </form>
+                  )}
 
+                  {t.status === "EN_CURSO" && (
+                    <form action={setStatus}>
+                      <input type="hidden" name="transferId" value={t.id} />
+                      <input
+                        type="hidden"
+                        name="next"
+                        value="EN_CAMINO_PRUEBA"
+                      />
+                      <button className="border px-3 py-2" type="submit">
+                        En camino a prueba
+                      </button>
+                    </form>
+                  )}
+
+                  {t.status === "EN_CAMINO_PRUEBA" && (
+                    <>
+                      <form action={setStatus}>
+                        <input type="hidden" name="transferId" value={t.id} />
+                        <input type="hidden" name="next" value="EN_ESPERA" />
+                        <button className="border px-3 py-2" type="submit">
+                          En espera
+                        </button>
+                      </form>
+
+                      <form action={setStatus}>
+                        <input type="hidden" name="transferId" value={t.id} />
+                        <input type="hidden" name="next" value="EN_LA_PRUEBA" />
+                        <button className="border px-3 py-2" type="submit">
+                          En la prueba
+                        </button>
+                      </form>
+                    </>
+                  )}
+
+                  {t.status === "EN_ESPERA" && (
+                    <form action={setStatus}>
+                      <input type="hidden" name="transferId" value={t.id} />
+                      <input type="hidden" name="next" value="EN_LA_PRUEBA" />
+                      <button className="border px-3 py-2" type="submit">
+                        En la prueba
+                      </button>
+                    </form>
+                  )}
+
+                  {t.status === "EN_LA_PRUEBA" && (
+                    <form action={setStatus}>
+                      <input type="hidden" name="transferId" value={t.id} />
+                      <input type="hidden" name="next" value="VUELTA" />
+                      <button className="border px-3 py-2" type="submit">
+                        Iniciar vuelta
+                      </button>
+                    </form>
+                  )}
+
+                  {t.status === "VUELTA" && (
+                    <form action={setStatus}>
+                      <input type="hidden" name="transferId" value={t.id} />
+                      <input type="hidden" name="next" value="FINALIZADO" />
+                      <button className="border px-3 py-2" type="submit">
+                        Finalizar
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Pausar / Reanudar */}
                   {t.status !== "PAUSADO" ? (
                     <form action={pauseTransfer}>
                       <input type="hidden" name="transferId" value={t.id} />
