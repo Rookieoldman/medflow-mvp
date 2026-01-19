@@ -16,7 +16,7 @@ export default async function RootLayout({
         {session && (
           <header className="border-b px-6 py-3 flex items-center justify-between">
             <div className="text-sm font-mono">
-              {session.user?.email} · {session.user?.role}
+              Hola {session.user?.name} · {session.user?.role}
             </div>
 
             <LogoutButton />

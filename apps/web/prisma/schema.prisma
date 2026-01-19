@@ -1,5 +1,7 @@
 generator client {
   provider = "prisma-client-js"
+  engineType    = "binary"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-1.1.x"]
 }
 
 datasource db {
@@ -8,18 +10,29 @@ datasource db {
 }
 
 model User {
-  id                String     @id @default(cuid())
-  email             String     @unique
-  password          String
-  role              Role
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  role          Role
+
+  firstName     String?
+  lastName1     String?
+  lastName2     String?
+
+  employeeCode String?  @unique
+  shift         Shift?
+  active        Boolean @default(true)
+  notes         String?
+
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 
   transfersAssigned Transfer[] @relation("AssignedTransfers")
   transfersCreated  Transfer[] @relation("CreatedTransfers")
   incidentsCreated  Incident[] @relation("IncidentsCreated")
 
-  transferAcceptances TransferAcceptance[]
-
-  createdAt         DateTime   @default(now())
+  acceptances TransferAcceptance[]
 }
 
 model Transfer {
@@ -58,11 +71,10 @@ model TransferAcceptance {
   signerName    String
   signerRole    String?
   signatureData String
+  signedAt      DateTime @default(now())
 
   celadorId     String
   celador       User     @relation(fields: [celadorId], references: [id])
-
-  signedAt      DateTime @default(now())
 }
 
 model Incident {
@@ -117,4 +129,10 @@ enum TestType {
   RX
   MEDICINA_NUCLEAR
   TC
+}
+
+enum Shift {
+  MANANA
+  TARDE
+  NOCHE
 }
