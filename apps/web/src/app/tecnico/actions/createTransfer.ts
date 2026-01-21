@@ -53,6 +53,6 @@ export async function createTransfer(formData: FormData) {
       createdById: session.user.id,
     },
   });
-
-  redirect("/");
+  console.log("CREATED BY ID:", session.user.id);
+  redirect("/tecnico");
 }

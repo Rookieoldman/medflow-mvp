@@ -1,31 +1,20 @@
-# ---------- deps ----------
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
+FROM node:20-alpine
 
-# ---------- dev ----------
-FROM node:20-alpine AS dev
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+
+# Dependencias
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Prisma (MUY IMPORTANTE)
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Código (solo lo necesario)
+COPY src ./src
+COPY public ./public
+COPY next.config.* ./
+COPY tsconfig.json ./
+
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
-
-# ---------- build ----------
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
-
-# ---------- prod ----------
-FROM node:20-alpine AS prod
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/public ./public
-EXPOSE 3000
-CMD ["npm", "start"]

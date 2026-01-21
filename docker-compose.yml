@@ -14,7 +14,6 @@ services:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
-      target: dev
     environment:
       DATABASE_URL: postgresql://medflow:medflow@db:5432/medflow?schema=public
       NEXTAUTH_SECRET: super-secret-medflow-dev

@@ -1,34 +1,10 @@
-# Node / Next
 node_modules
 .next
-dist
-build
-
-# Prisma
-prisma/dev.db
-prisma/*.db
-
-# Git
+.prisma
+.env
+.env.*
 .git
 .gitignore
-
-# Docker
 Dockerfile
 docker-compose.yml
-
-# Logs
-npm-debug.log
-yarn-error.log
-pnpm-debug.log
-
-# OS
-.DS_Store
-
-# Env
-.env
-.env.local
-.env.* 
-
-# Tests / docs
-coverage
-*.md
+*.log

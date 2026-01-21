@@ -52,7 +52,7 @@ export default async function TransferDetail({
 
   return (
     <main className="p-6 space-y-6">
-      <a href="/" className="underline text-sm">
+      <a href="/tecnico" className="underline text-sm">
         ← Volver
       </a>
 
