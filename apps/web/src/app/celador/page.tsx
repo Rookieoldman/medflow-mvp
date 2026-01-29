@@ -14,7 +14,7 @@ export default async function CeladorPage() {
   });
 
   const mine = await prisma.transfer.findMany({
-    where: { assignedToId: celador.id, status: { notIn: ["FINALIZADO"] } },
+    where: { assignedToId: celador.id, status: { notIn: ["FINALIZADO","CANCELADO"] } },
     orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
   });
 

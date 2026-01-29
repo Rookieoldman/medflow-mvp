@@ -23,14 +23,16 @@ export default async function TransferDetail({
 
   const transfer = await prisma.transfer.findUnique({
     where: { id },
-    include: { incidents: { orderBy: { createdAt: "desc" } } },
+    include: {
+      incidents: { orderBy: { createdAt: "desc" } },
+    },
   });
 
   if (!transfer) {
-    return <main className="p-6">No encontrado</main>;
+    return <main className="p-6">Traslado no encontrado</main>;
   }
 
-  // Usuario en modo dev
+  // 👤 Usuarios DEV (MVP)
   const tecnico = await getOrCreateDevTecnico();
   const celador = await getOrCreateDevCelador();
 
@@ -39,47 +41,65 @@ export default async function TransferDetail({
 
   const canSeeSensitiveData = isCreator || isAssignedCelador;
 
+  const isFinal =
+    transfer.status === "FINALIZADO" || transfer.status === "CANCELADO";
+
   const canMarkEnLaPrueba =
-    transfer.status === "EN_CAMINO_PRUEBA" ||
-    transfer.status === "EN_ESPERA";
+    !isFinal &&
+    (transfer.status === "EN_CAMINO_PRUEBA" || transfer.status === "EN_ESPERA");
 
   const canCancel =
-    transfer.status === "ASIGNADO" ||
-    transfer.status === "EN_CURSO" ||
-    transfer.status === "EN_CAMINO_PRUEBA" ||
-    transfer.status === "EN_ESPERA" ||
-    transfer.status === "EN_LA_PRUEBA";
+    !isFinal &&
+    (transfer.status === "ASIGNADO" ||
+      transfer.status === "EN_CURSO" ||
+      transfer.status === "EN_CAMINO_PRUEBA" ||
+      transfer.status === "EN_ESPERA" ||
+      transfer.status === "EN_LA_PRUEBA");
+
+  const backHref = isCreator ? "/tecnico" : "/celador";
 
   return (
     <main className="p-6 space-y-6">
-      <a href="/tecnico" className="underline text-sm">
+      {/* VOLVER */}
+      <a href={backHref} className="underline text-sm">
         ← Volver
       </a>
 
-      {/* ===== CABECERA DEL TRASLADO ===== */}
-      <header className="space-y-3 border rounded p-4">
+      {/* ======================
+          CABECERA
+      ====================== */}
+      <header className="space-y-3 border rounded p-4 relative">
         {/* MRN */}
         <div className="font-mono text-sm text-gray-600">
           Nº historia: {transfer.mrn}
         </div>
 
-        {/* Iniciales */}
+        {/* INICIALES */}
         <div className="text-3xl font-semibold">
           {initials(transfer.patientFullName)}
         </div>
 
-        {/* Ubicación → Prueba */}
+        {/* UBICACIÓN */}
         <div className="text-lg text-gray-700">
           {transfer.location} → {transfer.testType}
         </div>
 
-        {/* Badges */}
+        {/* BADGES */}
         <div className="flex gap-2 flex-wrap">
           <PriorityBadge priority={transfer.priority} />
           <StatusBadge status={transfer.status} />
         </div>
 
-        {/* Datos sensibles */}
+        {/* MENSAJE FINAL */}
+        {isFinal && (
+          <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            Este traslado está{" "}
+            {transfer.status === "CANCELADO" ? "cancelado" : "finalizado"} y no
+            admite más acciones.
+          </div>
+        )}
+
+        {/* DATOS SENSIBLES */}
         {canSeeSensitiveData ? (
           <div className="mt-4 border-t pt-4 space-y-1">
             <div>
@@ -98,11 +118,13 @@ export default async function TransferDetail({
         )}
       </header>
 
-      {/* ===== ACCIONES ===== */}
+      {/* ======================
+          ACCIONES
+      ====================== */}
       {canMarkEnLaPrueba && (
         <form action={markEnLaPrueba}>
           <input type="hidden" name="transferId" value={transfer.id} />
-          <button className="bg-green-600 text-white px-4 py-2" type="submit">
+          <button className="bg-green-600 text-white px-4 py-2 rounded">
             Marcar “En la prueba”
           </button>
         </form>
@@ -112,7 +134,9 @@ export default async function TransferDetail({
         <CancelPruebaButton transferId={transfer.id} action={cancelPrueba} />
       )}
 
-      {/* ===== INCIDENCIAS ===== */}
+      {/* ======================
+          INCIDENCIAS
+      ====================== */}
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">Incidencias</h2>
 

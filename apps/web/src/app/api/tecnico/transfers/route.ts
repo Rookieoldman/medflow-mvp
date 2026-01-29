@@ -17,7 +17,7 @@ export async function GET() {
   const transfers = await prisma.transfer.findMany({
     where: {
       createdById: session.user.id,
-      status: { not: "FINALIZADO" },
+      status: { notIn: ["FINALIZADO", "CANCELADO"] },
     },
     orderBy: [
       { priority: "desc" },
