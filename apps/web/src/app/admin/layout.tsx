@@ -28,7 +28,7 @@ export default async function AdminLayout({
       <nav className="flex gap-4 border-b pb-2">
         <AdminTab href="/admin/users" label="Usuarios" />
         <AdminTab href="/admin" label="Traslados" />
-        <AdminTab href="/admin/stats" label="Estadísticas" />
+        <AdminTab href="/admin/stats/globalStats" label="Estadísticas" />
       </nav>
 
       {/* CONTENIDO */}

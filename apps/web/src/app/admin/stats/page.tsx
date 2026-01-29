@@ -1,35 +1,36 @@
 import { prisma } from "@/lib/prisma";
+import ChartsClient from "./ChartsClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminStatsPage() {
-  const totalTransfers = await prisma.transfer.count();
-  const finishedTransfers = await prisma.transfer.count({
-    where: { status: "FINALIZADO" },
+  // Traslados por estado
+  const byStatus = await prisma.transfer.groupBy({
+    by: ["status"],
+    _count: { status: true },
   });
 
-  const celadores = await prisma.user.count({
-    where: { role: "CELADOR", active: true },
+  // Traslados por tipo de prueba
+  const byTestType = await prisma.transfer.groupBy({
+    by: ["testType"],
+    _count: { testType: true },
+  });
+
+  // Traslados por prioridad
+  const byPriority = await prisma.transfer.groupBy({
+    by: ["priority"],
+    _count: { priority: true },
   });
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Estadísticas</h2>
+    <main className="p-6 space-y-8">
+      <h1 className="text-2xl font-semibold">Estadísticas</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Traslados totales" value={totalTransfers} />
-        <Stat label="Finalizados" value={finishedTransfers} />
-        <Stat label="Celadores activos" value={celadores} />
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border rounded p-4">
-      <div className="text-sm text-gray-500">{label}</div>
-      <div className="text-2xl font-semibold">{value}</div>
-    </div>
+      <ChartsClient
+        byStatus={byStatus}
+        byTestType={byTestType}
+        byPriority={byPriority}
+      />
+    </main>
   );
 }
