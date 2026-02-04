@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getOrCreateDevCelador } from "@/lib/devUser";
+import { redirect } from "next/navigation";
 
 export async function markEnLaPrueba(formData: FormData) {
   const transferId = String(formData.get("transferId") ?? "");
@@ -64,10 +65,9 @@ export async function cancelPrueba(formData: FormData) {
     }),
   ]);
 
-  // 🔄 Revalidar TODAS las vistas afectadas
   revalidatePath("/celador");
   revalidatePath("/tecnico");
   revalidatePath("/admin");
-  revalidatePath(`/transfer/${transferId}`);
   revalidatePath(`/celador/transfer/${transferId}`);
+  revalidatePath(`/tecnico/transfers/${transferId}`);
 }

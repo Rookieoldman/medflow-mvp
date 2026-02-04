@@ -5,6 +5,7 @@ import { getOrCreateDevTecnico, getOrCreateDevCelador } from "@/lib/devUser";
 import { initials } from "@/lib/patient";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -61,9 +62,9 @@ export default async function TransferDetail({
   return (
     <main className="p-6 space-y-6">
       {/* VOLVER */}
-      <a href={backHref} className="underline text-sm">
+      <Link href="/tecnico" className="underline text-sm">
         ← Volver
-      </a>
+      </Link>
 
       {/* ======================
           CABECERA
