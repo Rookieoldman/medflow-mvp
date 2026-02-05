@@ -1,8 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getOrCreateDevCelador } from "@/lib/devUser";
 import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+
 
 /**
  * Flujo permitido de estados
@@ -25,23 +27,33 @@ const ALLOWED: Record<string, string[]> = {
 ============================================================ */
 export async function assignToMe(formData: FormData) {
   const transferId = String(formData.get("transferId") ?? "");
-  if (!transferId) throw new Error("Falta transferId");
 
-  const celador = await getOrCreateDevCelador();
-  const t = await prisma.transfer.findUnique({ where: { id: transferId } });
-  if (!t) throw new Error("Traslado no encontrado");
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id || session.user.role !== "CELADOR") {
+    throw new Error("No autorizado");
+  }
 
-  if (t.status !== "SOLICITADO" || t.assignedToId) {
-    throw new Error("Este traslado ya no está disponible");
+  const celadorId = session.user.id;
+
+  const transfer = await prisma.transfer.findUnique({
+    where: { id: transferId },
+  });
+
+  if (!transfer) throw new Error("Traslado no encontrado");
+
+  if (transfer.assignedToId) {
+    throw new Error("El traslado ya está asignado");
   }
 
   await prisma.transfer.update({
     where: { id: transferId },
-    data: { status: "ASIGNADO", assignedToId: celador.id },
+    data: {
+      assignedToId: celadorId,
+      status: "ASIGNADO",
+    },
   });
 
   revalidatePath("/celador");
-  revalidatePath(`/transfer/${transferId}`);
 }
 
 /* ============================================================

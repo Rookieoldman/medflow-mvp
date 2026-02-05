@@ -16,12 +16,7 @@ export async function GET() {
 
   const celadorId = session.user.id;
 
-  /* ===========================
-     TRASLADOS DISPONIBLES
-     - NO asignados
-     - NO cancelados
-     - NO finalizados
-  ============================ */
+  // 🔵 TRASLADOS DISPONIBLES
   const available = await prisma.transfer.findMany({
     where: {
       assignedToId: null,
@@ -30,16 +25,12 @@ export async function GET() {
       },
     },
     orderBy: [
-      { priority: "desc" }, // urgentes primero
+      { priority: "desc" },
       { createdAt: "asc" },
     ],
   });
 
-  /* ===========================
-     MIS TRASLADOS
-     - asignados a mí
-     - activos
-  ============================ */
+  // 🟢 MIS TRASLADOS
   const mine = await prisma.transfer.findMany({
     where: {
       assignedToId: celadorId,
