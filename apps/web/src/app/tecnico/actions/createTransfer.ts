@@ -6,7 +6,6 @@ import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
 
 export async function createTransfer(formData: FormData) {
-  // 🔐 SESIÓN REAL
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
@@ -21,9 +20,10 @@ export async function createTransfer(formData: FormData) {
   const location = String(formData.get("location") ?? "").trim();
   const testType = String(formData.get("testType") ?? "").trim();
   const priority = String(formData.get("priority") ?? "NORMAL");
+  const scope = String(formData.get("scope") ?? "URGENCIAS");
 
   if (!mrn || !lastName1 || !firstName || !dobRaw || !location || !testType) {
-    throw new Error("Todos los campos obligatorios deben rellenarse");
+    throw new Error("Campos obligatorios incompletos");
   }
 
   const patientFullName = lastName2
@@ -39,6 +39,12 @@ export async function createTransfer(formData: FormData) {
     throw new Error("Prioridad inválida");
   }
 
+  if (!["URGENCIAS", "PLANTA"].includes(scope)) {
+    throw new Error("Ámbito inválido");
+  }
+
+  const requiresAcceptance = scope === "PLANTA";
+
   await prisma.transfer.create({
     data: {
       mrn,
@@ -47,12 +53,12 @@ export async function createTransfer(formData: FormData) {
       location,
       testType: testType as any,
       priority: priority as any,
+      scope: scope as any,
+      requiresAcceptance,
       status: "SOLICITADO",
-
-      // ✅ AQUÍ ESTÁ LA CLAVE
       createdById: session.user.id,
     },
   });
-  console.log("CREATED BY ID:", session.user.id);
+
   redirect("/tecnico");
 }

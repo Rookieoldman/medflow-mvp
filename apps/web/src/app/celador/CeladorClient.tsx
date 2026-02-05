@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import LoadingInline from "@/components/LoadingInline";
 
 import {
   assignToMe,
@@ -17,6 +16,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { initials } from "@/lib/patient";
 import ElapsedTime from "@/components/ElapsedTime";
+import LoadingInline from "@/components/LoadingInline";
 
 type Transfer = {
   id: string;
@@ -27,18 +27,18 @@ type Transfer = {
   priority: string;
   status: string;
   createdAt: string;
-  acceptance?: unknown;
+  requiresAcceptance?: boolean;
 };
 
 export default function CeladorClient() {
   const [available, setAvailable] = useState<Transfer[]>([]);
   const [mine, setMine] = useState<Transfer[]>([]);
-  const [openSignature, setOpenSignature] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [openSignature, setOpenSignature] = useState<string | null>(null);
 
-  // ===========================
-  // POLLING
-  // ===========================
+  /* ===========================
+     POLLING
+  ============================ */
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
@@ -50,15 +50,13 @@ export default function CeladorClient() {
       setAvailable(data.available ?? []);
       setMine(data.mine ?? []);
 
-      // 🔓 liberar bloqueo si ya no existe o cambió
+      // 🔓 desbloqueo si ya no existe
       if (pendingId) {
-        const stillExists =
+        const exists =
           data.available?.some((t: Transfer) => t.id === pendingId) ||
           data.mine?.some((t: Transfer) => t.id === pendingId);
 
-        if (!stillExists) {
-          setPendingId(null);
-        }
+        if (!exists) setPendingId(null);
       }
     };
 
@@ -68,13 +66,13 @@ export default function CeladorClient() {
     return () => clearInterval(timer);
   }, [pendingId]);
 
-  // ===========================
-  // HELPERS
-  // ===========================
-  const runAction = async (
+  /* ===========================
+     HELPER EJECUCIÓN SEGURA
+  ============================ */
+  const run = async (
     transferId: string,
     action: (fd: FormData) => Promise<void>,
-    buildFormData?: (fd: FormData) => void
+    extra?: (fd: FormData) => void
   ) => {
     if (pendingId) return;
 
@@ -82,7 +80,7 @@ export default function CeladorClient() {
 
     const fd = new FormData();
     fd.set("transferId", transferId);
-    buildFormData?.(fd);
+    extra?.(fd);
 
     try {
       await action(fd);
@@ -91,19 +89,17 @@ export default function CeladorClient() {
       setPendingId(null);
     }
 
-    // ⏱️ desbloqueo defensivo
-    setTimeout(() => {
-      setPendingId(null);
-    }, 2000);
+    // fallback defensivo
+    setTimeout(() => setPendingId(null), 2000);
   };
 
-  // ===========================
-  // RENDER
-  // ===========================
+  /* ===========================
+     RENDER
+  ============================ */
   return (
     <>
       {/* ===========================
-          TRASLADOS DISPONIBLES
+          DISPONIBLES
       ============================ */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Traslados disponibles</h2>
@@ -115,7 +111,7 @@ export default function CeladorClient() {
             {available.map((t) => (
               <div
                 key={t.id}
-                className="relative border rounded p-4 flex items-center justify-between"
+                className="relative border rounded p-4 flex justify-between"
               >
                 <div className="absolute top-2 right-2">
                   <ElapsedTime createdAt={t.createdAt} />
@@ -137,7 +133,7 @@ export default function CeladorClient() {
 
                 <button
                   disabled={pendingId === t.id}
-                  onClick={() => runAction(t.id, assignToMe)}
+                  onClick={() => run(t.id, assignToMe)}
                   className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
                 >
                   Asignarme
@@ -170,7 +166,7 @@ export default function CeladorClient() {
                     <ElapsedTime createdAt={t.createdAt} />
                   </div>
 
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex justify-between gap-4">
                     <div className="space-y-1">
                       <div className="font-mono text-sm">{t.mrn}</div>
                       <div className="text-2xl font-semibold">
@@ -193,15 +189,17 @@ export default function CeladorClient() {
                     </Link>
                   </div>
 
-                  {/* BOTONES */}
+                  {/* ===========================
+                      ACCIONES
+                  ============================ */}
                   <div className="flex flex-wrap gap-2">
-                    {t.status === "ASIGNADO" && (
+                    {t.status === "ASIGNADO" && t.requiresAcceptance && (
                       <button
                         disabled={disabled}
                         onClick={() => setOpenSignature(t.id)}
                         className="border px-3 py-2 rounded disabled:opacity-50"
                       >
-                        Aceptar traslado (firma)
+                        Firmar responsable
                       </button>
                     )}
 
@@ -209,50 +207,8 @@ export default function CeladorClient() {
                       <button
                         disabled={disabled}
                         onClick={() =>
-                          runAction(t.id, setStatus, (fd) =>
-                            fd.set("next", "EN_CAMINO_PRUEBA")
-                          )
-                        }
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        En camino a prueba
-                      </button>
-                    )}
-
-                    {t.status === "EN_CAMINO_PRUEBA" && (
-                      <>
-                        <button
-                          disabled={disabled}
-                          onClick={() =>
-                            runAction(t.id, setStatus, (fd) =>
-                              fd.set("next", "EN_ESPERA")
-                            )
-                          }
-                          className="border px-3 py-2 rounded disabled:opacity-50"
-                        >
-                          En espera
-                        </button>
-
-                        <button
-                          disabled={disabled}
-                          onClick={() =>
-                            runAction(t.id, setStatus, (fd) =>
-                              fd.set("next", "EN_LA_PRUEBA")
-                            )
-                          }
-                          className="border px-3 py-2 rounded disabled:opacity-50"
-                        >
-                          En la prueba
-                        </button>
-                      </>
-                    )}
-
-                    {t.status === "EN_ESPERA" && (
-                      <button
-                        disabled={disabled}
-                        onClick={() =>
-                          runAction(t.id, setStatus, (fd) =>
-                            fd.set("next", "EN_LA_PRUEBA")
+                          run(t.id, setStatus, (fd) =>
+                            fd.set("next", "EN_PRUEBA")
                           )
                         }
                         className="border px-3 py-2 rounded disabled:opacity-50"
@@ -261,25 +217,11 @@ export default function CeladorClient() {
                       </button>
                     )}
 
-                    {t.status === "EN_LA_PRUEBA" && (
+                    {t.status === "EN_PRUEBA" && (
                       <button
                         disabled={disabled}
                         onClick={() =>
-                          runAction(t.id, setStatus, (fd) =>
-                            fd.set("next", "VUELTA")
-                          )
-                        }
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        Iniciar vuelta
-                      </button>
-                    )}
-
-                    {t.status === "VUELTA" && (
-                      <button
-                        disabled={disabled}
-                        onClick={() =>
-                          runAction(t.id, setStatus, (fd) =>
+                          run(t.id, setStatus, (fd) =>
                             fd.set("next", "FINALIZADO")
                           )
                         }
@@ -292,7 +234,7 @@ export default function CeladorClient() {
                     {t.status !== "PAUSADO" ? (
                       <button
                         disabled={disabled}
-                        onClick={() => runAction(t.id, pauseTransfer)}
+                        onClick={() => run(t.id, pauseTransfer)}
                         className="border px-3 py-2 rounded disabled:opacity-50"
                       >
                         Pausar
@@ -300,21 +242,14 @@ export default function CeladorClient() {
                     ) : (
                       <button
                         disabled={disabled}
-                        onClick={() => runAction(t.id, resumeTransfer)}
+                        onClick={() => run(t.id, resumeTransfer)}
                         className="border px-3 py-2 rounded disabled:opacity-50"
                       >
                         Reanudar
                       </button>
                     )}
 
-                    <Link
-                      href={`/celador/incidencia/${t.id}`}
-                      className="border px-3 py-2 rounded"
-                    >
-                      Registrar incidencia
-                    </Link>
-
-                    {disabled && <LoadingInline label="Actualizando estado" />}
+                    {disabled && <LoadingInline label="Actualizando..." />}
                   </div>
                 </div>
               );
@@ -323,7 +258,9 @@ export default function CeladorClient() {
         )}
       </section>
 
-      {/* MODAL FIRMA */}
+      {/* ===========================
+          MODAL FIRMA
+      ============================ */}
       <SignatureModal
         open={!!openSignature}
         onClose={() => setOpenSignature(null)}

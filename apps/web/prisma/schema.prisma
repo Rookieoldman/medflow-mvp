@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   engineType    = "binary"
   binaryTargets = ["native", "linux-musl-arm64-openssl-1.1.x"]
 }
@@ -10,86 +10,83 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  password      String
-  role          Role
+  id        String  @id @default(cuid())
+  email     String  @unique
+  password  String
+  role      Role
+  firstName String?
+  lastName1 String?
+  lastName2 String?
+  active    Boolean @default(true)
 
-  firstName     String?
-  lastName1     String?
-  lastName2     String?
-
-  employeeCode String?  @unique
-  shift         Shift?
-  active        Boolean @default(true)
-  notes         String?
-
-  lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
-
-  transfersAssigned Transfer[] @relation("AssignedTransfers")
-  transfersCreated  Transfer[] @relation("CreatedTransfers")
+  // RELACIONES
+  transfersCreated  Transfer[] @relation("TransfersCreated")
+  transfersAssigned Transfer[] @relation("TransfersAssigned")
   incidentsCreated  Incident[] @relation("IncidentsCreated")
 
-  acceptances TransferAcceptance[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  transferAcceptances TransferAcceptance[]
+}
+
+enum TransferScope {
+  PLANTA
+  URGENCIAS
 }
 
 model Transfer {
-  id              String         @id @default(cuid())
+  id                  String   @id @default(cuid())
+  mrn                 String
+  patientFullName     String
+  dob                 DateTime
+  location            String
+  testType            TestType
+  priority            Priority
+  status              TransferStatus
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  priority        Priority       @default(NORMAL)
-  status          TransferStatus @default(SOLICITADO)
-  previousStatus  TransferStatus?
+  // 👇 NUEVO
+  scope               TransferScope @default(PLANTA)
+  requiresAcceptance  Boolean       @default(true)
 
-  mrn             String
-  patientFullName String
-  dob             DateTime
-  location        String
-  testType        TestType
+  previousStatus      TransferStatus?
+  createdById         String
+  assignedToId        String?
 
-  createdById     String
-  createdBy       User           @relation("CreatedTransfers", fields: [createdById], references: [id])
-
-  assignedToId    String?
-  assignedTo      User?          @relation("AssignedTransfers", fields: [assignedToId], references: [id])
-
-  acceptance      TransferAcceptance?
-
-  incidents       Incident[]
-
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdBy           User     @relation("TransfersCreated", fields: [createdById], references: [id])
+  assignedTo          User?    @relation("TransfersAssigned", fields: [assignedToId], references: [id])
+  acceptance          TransferAcceptance?
+  incidents           Incident[]
 }
 
 model TransferAcceptance {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  transferId    String   @unique
-  transfer      Transfer @relation(fields: [transferId], references: [id])
+  transferId String   @unique
+  transfer   Transfer @relation(fields: [transferId], references: [id])
 
   signerName    String
   signerRole    String?
   signatureData String
   signedAt      DateTime @default(now())
 
-  celadorId     String
-  celador       User     @relation(fields: [celadorId], references: [id])
+  celadorId String
+  celador   User   @relation(fields: [celadorId], references: [id])
 }
 
 model Incident {
-  id           String   @id @default(cuid())
+  id         String   @id @default(cuid())
+  transferId String
+  transfer   Transfer @relation(fields: [transferId], references: [id])
 
-  transferId   String
-  transfer     Transfer @relation(fields: [transferId], references: [id])
+  type IncidentType
+  note String?
 
-  type         IncidentType
-  note         String?
+  createdById String
+  createdBy   User   @relation("IncidentsCreated", fields: [createdById], references: [id])
 
-  createdById  String?
-  createdBy    User?    @relation("IncidentsCreated", fields: [createdById], references: [id])
-
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 enum Role {
@@ -107,10 +104,7 @@ enum TransferStatus {
   SOLICITADO
   ASIGNADO
   EN_CURSO
-  EN_CAMINO_PRUEBA
-  EN_ESPERA
-  EN_LA_PRUEBA
-  VUELTA
+  EN_PRUEBA
   FINALIZADO
   PAUSADO
   CANCELADO

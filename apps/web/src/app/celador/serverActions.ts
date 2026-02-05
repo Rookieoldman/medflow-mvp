@@ -6,30 +6,67 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 
 /* ============================================================
-   ASIGNARSE UN TRASLADO
+   ESTADOS SIMPLIFICADOS
 ============================================================ */
-export async function assignToMe(formData: FormData) {
-  const transferId = String(formData.get("transferId") ?? "");
+/*
+SOLICITADO
+ASIGNADO        (solo si requiere firma)
+EN_CURSO
+EN_PRUEBA
+FINALIZADO
+CANCELADO
+PAUSADO
+*/
 
+const ALLOWED: Record<string, string[]> = {
+  SOLICITADO: ["ASIGNADO", "EN_CURSO"],
+  ASIGNADO: ["EN_CURSO"],
+  EN_CURSO: ["EN_PRUEBA", "PAUSADO", "CANCELADO"],
+  EN_PRUEBA: ["FINALIZADO", "PAUSADO", "CANCELADO"],
+  PAUSADO: ["EN_CURSO", "EN_PRUEBA"],
+};
+
+/* ============================================================
+   HELPERS
+============================================================ */
+async function getCeladorSession() {
   const session = await getServerSession(authOptions);
+
   if (!session?.user?.id || session.user.role !== "CELADOR") {
     throw new Error("No autorizado");
   }
 
-  const celadorId = session.user.id;
+  return session.user.id;
+}
+
+/* ============================================================
+   ASIGNARSE UN TRASLADO
+   - Si NO requiere firma → pasa directo a EN_CURSO
+   - Si requiere firma → queda en ASIGNADO
+============================================================ */
+export async function assignToMe(formData: FormData) {
+  const transferId = String(formData.get("transferId") ?? "");
+  if (!transferId) throw new Error("Falta transferId");
+
+  const celadorId = await getCeladorSession();
 
   const transfer = await prisma.transfer.findUnique({
     where: { id: transferId },
   });
 
   if (!transfer) throw new Error("Traslado no encontrado");
-  if (transfer.assignedToId) throw new Error("Ya está asignado");
+
+  if (transfer.assignedToId) {
+    throw new Error("Traslado ya asignado");
+  }
+
+  const nextStatus = transfer.requiresAcceptance ? "ASIGNADO" : "EN_CURSO";
 
   await prisma.transfer.update({
     where: { id: transferId },
     data: {
       assignedToId: celadorId,
-      status: "ASIGNADO",
+      status: nextStatus,
     },
   });
 
@@ -37,8 +74,108 @@ export async function assignToMe(formData: FormData) {
 }
 
 /* ============================================================
-   ACEPTAR TRASLADO (FIRMA)
-   ASIGNADO → EN_CURSO
+   CAMBIO DE ESTADO GENERAL
+============================================================ */
+export async function setStatus(formData: FormData) {
+  const transferId = String(formData.get("transferId") ?? "");
+  const next = String(formData.get("next") ?? "");
+
+  if (!transferId || !next) {
+    throw new Error("Faltan parámetros");
+  }
+
+  const celadorId = await getCeladorSession();
+
+  const transfer = await prisma.transfer.findUnique({
+    where: { id: transferId },
+  });
+
+  if (!transfer) throw new Error("Traslado no encontrado");
+
+  if (transfer.assignedToId !== celadorId) {
+    throw new Error("No puedes modificar este traslado");
+  }
+
+  const allowed = ALLOWED[transfer.status] ?? [];
+  if (!allowed.includes(next)) {
+    throw new Error(
+      `Transición no permitida: ${transfer.status} → ${next}`
+    );
+  }
+
+  await prisma.transfer.update({
+    where: { id: transferId },
+    data: {
+      status: next as any,
+    },
+  });
+
+  revalidatePath("/celador");
+}
+
+/* ============================================================
+   PAUSAR / REANUDAR
+============================================================ */
+export async function pauseTransfer(formData: FormData) {
+  const transferId = String(formData.get("transferId") ?? "");
+  if (!transferId) throw new Error("Falta transferId");
+
+  const celadorId = await getCeladorSession();
+
+  const transfer = await prisma.transfer.findUnique({
+    where: { id: transferId },
+  });
+
+  if (!transfer) throw new Error("Traslado no encontrado");
+
+  if (transfer.assignedToId !== celadorId) {
+    throw new Error("No puedes pausar este traslado");
+  }
+
+  if (transfer.status === "PAUSADO") return;
+
+  await prisma.transfer.update({
+    where: { id: transferId },
+    data: {
+      previousStatus: transfer.status,
+      status: "PAUSADO",
+    },
+  });
+
+  revalidatePath("/celador");
+}
+
+export async function resumeTransfer(formData: FormData) {
+  const transferId = String(formData.get("transferId") ?? "");
+  if (!transferId) throw new Error("Falta transferId");
+
+  const celadorId = await getCeladorSession();
+
+  const transfer = await prisma.transfer.findUnique({
+    where: { id: transferId },
+  });
+
+  if (!transfer) throw new Error("Traslado no encontrado");
+
+  if (transfer.assignedToId !== celadorId) {
+    throw new Error("No puedes reanudar este traslado");
+  }
+
+  if (transfer.status !== "PAUSADO") return;
+
+  await prisma.transfer.update({
+    where: { id: transferId },
+    data: {
+      status: transfer.previousStatus ?? "EN_CURSO",
+      previousStatus: null,
+    },
+  });
+
+  revalidatePath("/celador");
+}
+
+/* ============================================================
+   ACEPTACIÓN (FIRMA) — OPCIONAL
 ============================================================ */
 export async function acceptTransfer(formData: FormData) {
   const transferId = String(formData.get("transferId") ?? "");
@@ -47,15 +184,10 @@ export async function acceptTransfer(formData: FormData) {
   const signatureData = String(formData.get("signatureData") ?? "");
 
   if (!transferId || !signerName || !signatureData) {
-    throw new Error("Datos incompletos");
+    throw new Error("Datos de firma incompletos");
   }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "CELADOR") {
-    throw new Error("No autorizado");
-  }
-
-  const celadorId = session.user.id;
+  const celadorId = await getCeladorSession();
 
   const transfer = await prisma.transfer.findUnique({
     where: { id: transferId },
@@ -63,12 +195,17 @@ export async function acceptTransfer(formData: FormData) {
   });
 
   if (!transfer) throw new Error("Traslado no encontrado");
-  if (transfer.acceptance) throw new Error("Ya aceptado");
-  if (transfer.assignedToId !== celadorId) {
-    throw new Error("No es tu traslado");
+
+  if (!transfer.requiresAcceptance) {
+    throw new Error("Este traslado no requiere firma");
   }
+
   if (transfer.status !== "ASIGNADO") {
-    throw new Error("Estado inválido");
+    throw new Error("El traslado no está pendiente de firma");
+  }
+
+  if (transfer.acceptance) {
+    throw new Error("Ya firmado");
   }
 
   await prisma.$transaction([
@@ -85,104 +222,9 @@ export async function acceptTransfer(formData: FormData) {
       where: { id: transferId },
       data: {
         status: "EN_CURSO",
-        previousStatus: "ASIGNADO",
       },
     }),
   ]);
-
-  revalidatePath("/celador");
-}
-
-/* ============================================================
-   CAMBIO DE ESTADO
-============================================================ */
-export async function setStatus(formData: FormData) {
-  const transferId = String(formData.get("transferId") ?? "");
-  const next = String(formData.get("next") ?? "");
-
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "CELADOR") {
-    throw new Error("No autorizado");
-  }
-
-  const celadorId = session.user.id;
-
-  const transfer = await prisma.transfer.findUnique({
-    where: { id: transferId },
-  });
-
-  if (!transfer) throw new Error("Traslado no encontrado");
-  if (transfer.assignedToId !== celadorId) {
-    throw new Error("No es tu traslado");
-  }
-
-  await prisma.transfer.update({
-    where: { id: transferId },
-    data: { status: next as any },
-  });
-
-  revalidatePath("/celador");
-}
-
-/* ============================================================
-   PAUSAR / REANUDAR
-============================================================ */
-export async function pauseTransfer(formData: FormData) {
-  const transferId = String(formData.get("transferId") ?? "");
-
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "CELADOR") {
-    throw new Error("No autorizado");
-  }
-
-  const celadorId = session.user.id;
-
-  const transfer = await prisma.transfer.findUnique({
-    where: { id: transferId },
-  });
-
-  if (!transfer) throw new Error("Traslado no encontrado");
-  if (transfer.assignedToId !== celadorId) {
-    throw new Error("No es tu traslado");
-  }
-
-  await prisma.transfer.update({
-    where: { id: transferId },
-    data: {
-      previousStatus: transfer.status,
-      status: "PAUSADO",
-    },
-  });
-
-  revalidatePath("/celador");
-}
-
-export async function resumeTransfer(formData: FormData) {
-  const transferId = String(formData.get("transferId") ?? "");
-
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "CELADOR") {
-    throw new Error("No autorizado");
-  }
-
-  const celadorId = session.user.id;
-
-  const transfer = await prisma.transfer.findUnique({
-    where: { id: transferId },
-  });
-
-  if (!transfer) throw new Error("Traslado no encontrado");
-  if (transfer.assignedToId !== celadorId) {
-    throw new Error("No es tu traslado");
-  }
-
-  await prisma.transfer.update({
-    where: { id: transferId },
-    data: {
-      status: transfer.previousStatus ?? "ASIGNADO",
-      previousStatus: null,
-    },
-  });
 
   revalidatePath("/celador");
 }

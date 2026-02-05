@@ -6,44 +6,65 @@ import { authOptions } from "@/auth";
 export async function GET() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
-
-  if (session.user.role !== "CELADOR") {
+  if (!session?.user?.id || session.user.role !== "CELADOR") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   const celadorId = session.user.id;
 
-  // 🔵 TRASLADOS DISPONIBLES
+  /* ===========================
+     TRASLADOS DISPONIBLES
+     - NO asignados
+     - SOLO solicitados
+  ============================ */
   const available = await prisma.transfer.findMany({
     where: {
       assignedToId: null,
-      status: {
-        notIn: ["CANCELADO", "FINALIZADO"],
-      },
+      status: "SOLICITADO",
     },
     orderBy: [
       { priority: "desc" },
       { createdAt: "asc" },
     ],
+    select: {
+      id: true,
+      mrn: true,
+      patientFullName: true,
+      location: true,
+      testType: true,
+      priority: true,
+      status: true,
+      createdAt: true,
+      requiresAcceptance: true,
+    },
   });
 
-  // 🟢 MIS TRASLADOS
+  /* ===========================
+     MIS TRASLADOS
+     - asignados a mí
+     - activos
+  ============================ */
   const mine = await prisma.transfer.findMany({
     where: {
       assignedToId: celadorId,
       status: {
-        notIn: ["CANCELADO", "FINALIZADO"],
+        notIn: ["FINALIZADO", "CANCELADO"],
       },
     },
     orderBy: [
       { priority: "desc" },
       { createdAt: "asc" },
     ],
-    include: {
-      acceptance: true,
+    select: {
+      id: true,
+      mrn: true,
+      patientFullName: true,
+      location: true,
+      testType: true,
+      priority: true,
+      status: true,
+      createdAt: true,
+      requiresAcceptance: true,
     },
   });
 
