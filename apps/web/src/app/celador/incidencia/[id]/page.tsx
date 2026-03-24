@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import { redirect } from "next/navigation";
 import { createIncident } from "./serverActions";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
@@ -12,6 +15,9 @@ export default async function IncidenciaPage({
 }: {
   params: Promise<{ id: string }> | { id: string };
 }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id || session.user.role !== "CELADOR") redirect("/login");
+
   const resolved = await Promise.resolve(params as any);
   const id = resolved?.id;
 
@@ -22,6 +28,16 @@ export default async function IncidenciaPage({
   });
 
   if (!transfer) return <main className="p-6">Traslado no encontrado</main>;
+
+  // Solo el celador asignado puede registrar incidencias
+  if (transfer.assignedToId && transfer.assignedToId !== session.user.id) {
+    redirect("/celador");
+  }
+
+  // No se pueden registrar incidencias en traslados finalizados/cancelados
+  if (transfer.status === "FINALIZADO" || transfer.status === "CANCELADO") {
+    redirect(`/celador/transfer/${id}`);
+  }
 
   return (
     <main className="p-6 space-y-6 max-w-xl">
