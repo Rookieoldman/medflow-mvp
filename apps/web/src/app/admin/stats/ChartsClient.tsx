@@ -10,66 +10,77 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from "recharts";
 
-const COLORS = ["#111827", "#374151", "#6B7280", "#9CA3AF"];
+const PIE_COLORS = [
+  "#111827", "#374151", "#6B7280", "#9CA3AF", "#D1D5DB",
+];
 
-function format(data: any[], key: string) {
-  return data.map((d) => ({
-    name: d[key],
-    value: d._count[key],
-  }));
-}
+type DataPoint = { name: string; value: number };
+
+type Props = {
+  byStatus:    DataPoint[];
+  byTestType:  DataPoint[];
+  byPriority:  DataPoint[];
+  preFormatted?: boolean;
+};
 
 export default function ChartsClient({
   byStatus,
   byTestType,
   byPriority,
-}: any) {
+}: Props) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* ESTADO */}
-      <div className="border rounded p-4">
-        <h2 className="font-semibold mb-4">Traslados por estado</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={format(byStatus, "status")}>
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" fill="#111827" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* TIPO */}
-      <div className="border rounded p-4">
-        <h2 className="font-semibold mb-4">Traslados por tipo</h2>
-        <ResponsiveContainer width="100%" height={300}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* POR TIPO DE PRUEBA */}
+      <div className="border rounded-xl p-5 bg-white space-y-4">
+        <h2 className="font-semibold text-gray-800">Tipo de prueba</h2>
+        <ResponsiveContainer width="100%" height={260}>
           <PieChart>
             <Pie
-              data={format(byTestType, "testType")}
+              data={byTestType}
               dataKey="value"
               nameKey="name"
-              outerRadius={110}
+              outerRadius={90}
+              paddingAngle={2}
+              label={({ name, percent }) =>
+                `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+              }
+              labelLine={false}
             >
-              {byTestType.map((_: any, i: number) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              {byTestType.map((_, i) => (
+                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip formatter={(v) => [`${v}`, "Traslados"]} />
+            <Legend />
           </PieChart>
         </ResponsiveContainer>
       </div>
 
-      {/* PRIORIDAD */}
-      <div className="border rounded p-4 lg:col-span-2">
-        <h2 className="font-semibold mb-4">Prioridad</h2>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={format(byPriority, "priority")}>
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" fill="#374151" />
+      {/* POR PRIORIDAD */}
+      <div className="border rounded-xl p-5 bg-white space-y-4">
+        <h2 className="font-semibold text-gray-800">Por prioridad</h2>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={byPriority} barSize={48}>
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+            <Tooltip formatter={(v) => [`${v}`, "Traslados"]} />
+            <Bar dataKey="value" fill="#111827" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* POR ESTADO — barra horizontal completa */}
+      <div className="border rounded-xl p-5 bg-white space-y-4 lg:col-span-2">
+        <h2 className="font-semibold text-gray-800">Evolución por estado</h2>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={byStatus} barSize={32}>
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+            <Tooltip formatter={(v) => [`${v}`, "Traslados"]} />
+            <Bar dataKey="value" fill="#374151" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
