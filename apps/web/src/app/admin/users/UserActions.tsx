@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import { toggleUserActive } from "./serverActions";
 
 type Props = {
   userId: string;
@@ -9,52 +9,29 @@ type Props = {
 };
 
 export default function UserActions({ userId, active }: Props) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <div className="relative">
-      {/* Botón ⋮ */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="px-2 py-1 rounded hover:bg-gray-100"
+    <div className="flex items-center justify-end gap-2">
+      <Link
+        href={`/admin/users/${userId}`}
+        className="px-3 py-1 text-xs font-medium rounded-md border border-gray-300 hover:bg-gray-50 transition-colors"
       >
-        ⋮
-      </button>
+        Editar
+      </Link>
 
-      {open && (
-        <div className="absolute right-0 mt-2 w-40 rounded-md border bg-white shadow z-10">
-          <ul className="text-sm">
-            {/* Editar */}
-            <li>
-              <Link
-                href={`/admin/users/${userId}`}
-                className="block px-4 py-2 hover:bg-gray-100"
-                onClick={() => setOpen(false)}
-              >
-                Editar
-              </Link>
-            </li>
-
-            {/* Activar / Desactivar */}
-            <li>
-              <form action={toggleUserActive}>
-                <input type="hidden" name="userId" value={userId} />
-                <input
-                  type="hidden"
-                  name="active"
-                  value={active ? "false" : "true"}
-                />
-                <button
-                  type="submit"
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100"
-                >
-                  {active ? "Desactivar" : "Activar"}
-                </button>
-              </form>
-            </li>
-          </ul>
-        </div>
-      )}
+      <form action={toggleUserActive}>
+        <input type="hidden" name="userId" value={userId} />
+        <input type="hidden" name="active" value={active ? "false" : "true"} />
+        <button
+          type="submit"
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            active
+              ? "border border-red-200 text-red-600 hover:bg-red-50"
+              : "border border-green-200 text-green-600 hover:bg-green-50"
+          }`}
+        >
+          {active ? "Desactivar" : "Activar"}
+        </button>
+      </form>
     </div>
   );
 }

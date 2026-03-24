@@ -15,7 +15,6 @@ export async function updateUser(formData: FormData) {
       lastName1: String(formData.get("lastName1") || ""),
       lastName2: String(formData.get("lastName2") || ""),
       role: formData.get("role") as any,
-      shift: (formData.get("shift") as any) || null,
       active: formData.get("active") === "on",
     },
   });

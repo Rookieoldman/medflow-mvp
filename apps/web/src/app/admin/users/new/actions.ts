@@ -14,7 +14,6 @@ export async function createUser(formData: FormData) {
   const lastName1 = String(formData.get("lastName1") ?? "").trim();
   const lastName2 = String(formData.get("lastName2") ?? "").trim();
 
-  const shift = (formData.get("shift") as any) || null;
   const active = formData.get("active") === "on";
 
   if (!email || !password || !role) {
@@ -31,7 +30,6 @@ export async function createUser(formData: FormData) {
       firstName,
       lastName1,
       lastName2,
-      shift,
       active,
     },
   });

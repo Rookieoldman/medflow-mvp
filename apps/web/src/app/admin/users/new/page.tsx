@@ -5,90 +5,123 @@ export const dynamic = "force-dynamic";
 
 export default function NewUserPage() {
   return (
-    <main className="p-6 max-w-xl space-y-6">
-      <Link href="/admin/users" className="underline text-sm">
-        ← Volver
+    <div className="max-w-xl space-y-6">
+      <Link href="/admin/users" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
+        ← Volver a usuarios
       </Link>
 
-      <h1 className="text-xl font-semibold">Crear usuario</h1>
+      <div>
+        <h1 className="text-xl font-semibold">Crear usuario</h1>
+        <p className="text-sm text-gray-500 mt-1">Rellena los datos del nuevo usuario.</p>
+      </div>
 
-      <form action={createUser} className="space-y-4">
+      <form action={createUser} className="space-y-5 border rounded-xl p-6 shadow-sm bg-white">
+
         {/* Nombre */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <input
-            name="firstName"
-            placeholder="Nombre"
-            className="border rounded-lg p-2"
-          />
-          <input
-            name="lastName1"
-            placeholder="1er apellido"
-            className="border rounded-lg p-2"
-          />
-          <input
-            name="lastName2"
-            placeholder="2º apellido"
-            className="border rounded-lg p-2 md:col-span-2"
-          />
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium text-gray-700">Nombre completo</legend>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="firstName" className="text-xs text-gray-500">Nombre</label>
+              <input
+                id="firstName"
+                name="firstName"
+                placeholder="Ej. Juan"
+                className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="lastName1" className="text-xs text-gray-500">Primer apellido</label>
+              <input
+                id="lastName1"
+                name="lastName1"
+                placeholder="Ej. García"
+                className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+              />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <label htmlFor="lastName2" className="text-xs text-gray-500">Segundo apellido</label>
+              <input
+                id="lastName2"
+                name="lastName2"
+                placeholder="Ej. López"
+                className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        {/* Credenciales */}
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium text-gray-700">Credenciales de acceso</legend>
+          <div className="space-y-1">
+            <label htmlFor="email" className="text-xs text-gray-500">Email <span className="text-red-500">*</span></label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="usuario@medflow.dev"
+              className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="password" className="text-xs text-gray-500">Contraseña <span className="text-red-500">*</span></label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="Mínimo 8 caracteres"
+              className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+              required
+            />
+          </div>
+        </fieldset>
+
+        {/* Rol y estado */}
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium text-gray-700">Rol y estado</legend>
+          <div className="space-y-1">
+            <label htmlFor="role" className="text-xs text-gray-500">Rol <span className="text-red-500">*</span></label>
+            <select
+              id="role"
+              name="role"
+              className="border rounded-lg px-3 py-2 w-full text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300"
+              required
+            >
+              <option value="">Selecciona un rol</option>
+              <option value="TECNICO">Técnico</option>
+              <option value="CELADOR">Celador</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="active"
+              defaultChecked
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            <span className="text-sm text-gray-700">Usuario activo al crear</span>
+          </label>
+        </fieldset>
+
+        <div className="pt-2 flex items-center gap-3">
+          <button
+            type="submit"
+            className="rounded-lg bg-black text-white px-5 py-2 text-sm font-medium hover:bg-gray-800 transition-colors"
+          >
+            Crear usuario
+          </button>
+          <Link
+            href="/admin/users"
+            className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            Cancelar
+          </Link>
         </div>
-
-        {/* Email */}
-        <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          className="border rounded-lg p-2 w-full"
-          required
-        />
-
-        {/* Password */}
-        <input
-          name="password"
-          type="password"
-          placeholder="Contraseña"
-          className="border rounded-lg p-2 w-full"
-          required
-        />
-
-        {/* Rol */}
-        <select
-          name="role"
-          className="border rounded-lg p-2 w-full"
-          required
-        >
-          <option value="">Selecciona rol</option>
-          <option value="TECNICO">Técnico</option>
-          <option value="CELADOR">Celador</option>
-          <option value="ADMIN">Admin</option>
-        </select>
-
-        {/* Turno */}
-        <select name="shift" className="border rounded-lg p-2 w-full">
-          <option value="">Sin turno</option>
-          <option value="MANANA">Mañana</option>
-          <option value="TARDE">Tarde</option>
-          <option value="NOCHE">Noche</option>
-        </select>
-
-        {/* Activo */}
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="active"
-            defaultChecked
-            className="rounded"
-          />
-          Usuario activo
-        </label>
-
-        {/* Submit */}
-        <button
-          type="submit"
-          className="rounded-lg bg-black text-white px-4 py-2 hover:bg-gray-800 transition"
-        >
-          Crear usuario
-        </button>
       </form>
-    </main>
+    </div>
   );
 }
