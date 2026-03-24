@@ -2,58 +2,41 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { getOrCreateDevCelador } from "@/lib/devUser";
-import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
-export async function markEnLaPrueba(formData: FormData) {
-  const transferId = String(formData.get("transferId") ?? "");
-
-  const transfer = await prisma.transfer.findUnique({
-    where: { id: transferId },
-  });
-
-  if (!transfer) {
-    throw new Error("Traslado no encontrado");
+async function getTecnicoSession() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id || session.user.role !== "TECNICO") {
+    throw new Error("No autorizado");
   }
-
-  if (
-    transfer.status !== "EN_CAMINO_PRUEBA" &&
-    transfer.status !== "EN_ESPERA"
-  ) {
-    throw new Error("No se puede marcar 'En la prueba' en este estado");
-  }
-
-  await prisma.transfer.update({
-    where: { id: transferId },
-    data: { status: "EN_LA_PRUEBA" },
-  });
-
-  revalidatePath(`/transfer/${transferId}`);
+  return session.user.id;
 }
+
 export async function cancelPrueba(formData: FormData) {
+  const tecnicoId = await getTecnicoSession();
+
   const transferId = String(formData.get("transferId") ?? "");
   const note = String(formData.get("note") ?? "").trim();
-
   if (!transferId) throw new Error("Falta transferId");
-
-  const actor = await getOrCreateDevCelador();
 
   const t = await prisma.transfer.findUnique({ where: { id: transferId } });
   if (!t) throw new Error("Traslado no encontrado");
 
-  if (t.status === "FINALIZADO" || t.status === "CANCELADO") return;
-
-  if (t.assignedToId && t.assignedToId !== actor.id) {
-    throw new Error("No puedes cancelar un traslado de otro celador");
+  // Solo el técnico creador puede cancelar
+  if (t.createdById !== tecnicoId) {
+    throw new Error("No puedes cancelar un traslado que no has creado");
   }
+
+  if (t.status === "FINALIZADO" || t.status === "CANCELADO") return;
 
   await prisma.$transaction([
     prisma.incident.create({
       data: {
         transferId,
         type: "PRUEBA_CANCELADA",
-        note: note || "Prueba cancelada",
-        createdById: actor.id,
+        note: note || "Cancelado por técnico",
+        createdById: tecnicoId,
       },
     }),
     prisma.transfer.update({
@@ -65,9 +48,8 @@ export async function cancelPrueba(formData: FormData) {
     }),
   ]);
 
-  revalidatePath("/celador");
   revalidatePath("/tecnico");
+  revalidatePath("/celador");
   revalidatePath("/admin");
-  revalidatePath(`/celador/transfer/${transferId}`);
   revalidatePath(`/tecnico/transfers/${transferId}`);
 }

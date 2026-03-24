@@ -8,9 +8,8 @@ import { redirect } from "next/navigation";
 export async function createTransfer(formData: FormData) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.id) {
-    throw new Error("No autenticado");
-  }
+  if (!session?.user?.id) throw new Error("No autenticado");
+  if (session.user.role !== "TECNICO") throw new Error("No autorizado");
 
   const mrn = String(formData.get("mrn") ?? "").trim();
   const lastName1 = String(formData.get("lastName1") ?? "").trim();

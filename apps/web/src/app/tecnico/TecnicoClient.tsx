@@ -20,6 +20,7 @@ type Transfer = {
 
 export default function TecnicoClient() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -29,17 +30,25 @@ export default function TecnicoClient() {
       if (res.ok) {
         setTransfers(await res.json());
       }
+      setLoading(false);
     };
 
     fetchTransfers();
-
-    timer = setInterval(fetchTransfers, 15000); // ⏱️ 15s normal
-
+    timer = setInterval(fetchTransfers, 15000);
     return () => clearInterval(timer);
   }, []);
 
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-400">
+        <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+        Cargando solicitudes...
+      </div>
+    );
+  }
+
   if (transfers.length === 0) {
-    return <p className="text-sm text-gray-600">Aún no hay solicitudes.</p>;
+    return <p className="text-sm text-gray-400 italic">Aún no hay solicitudes activas.</p>;
   }
 
   return (

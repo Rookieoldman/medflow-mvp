@@ -8,8 +8,6 @@ export const dynamic = "force-dynamic";
 
 export default async function TecnicoPage() {
   const session = await getServerSession(authOptions);
-  console.log("SESSION TECNICO:", session);
-
   if (!session) redirect("/login");
   if (session.user.role !== "TECNICO") redirect("/login");
 

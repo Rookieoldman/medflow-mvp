@@ -2,6 +2,10 @@ import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
 async function getOrCreateDevUser(email: string, role: "TECNICO" | "CELADOR" | "ADMIN") {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`[devUser] No se puede usar getOrCreateDevUser en producción (email: ${email})`);
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing;
 

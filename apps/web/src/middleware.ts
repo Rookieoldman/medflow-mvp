@@ -21,7 +21,11 @@ export async function middleware(req: NextRequest) {
   // 🔒 PROTECCIÓN POR ROL
 
   // Técnico
-  if (pathname === "/" || pathname.startsWith("/transfer")) {
+  if (
+    pathname === "/" ||
+    pathname.startsWith("/tecnico") ||
+    pathname.startsWith("/transfer")
+  ) {
     if (role !== "TECNICO") {
       return NextResponse.redirect(
         new URL(role === "CELADOR" ? "/celador" : "/admin", req.url)
@@ -53,6 +57,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/",
+    "/tecnico/:path*",
     "/transfer/:path*",
     "/celador/:path*",
     "/admin/:path*",

@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { markEnLaPrueba, cancelPrueba } from "./serverActions";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import { redirect } from "next/navigation";
+import { cancelPrueba } from "./serverActions";
 import CancelPruebaButton from "./CancelPruebaButton";
-import { getOrCreateDevTecnico, getOrCreateDevCelador } from "@/lib/devUser";
 import { initials } from "@/lib/patient";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
@@ -10,17 +12,24 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const INCIDENT_LABELS: Record<string, string> = {
+  PACIENTE_NO_PREPARADO: "Paciente no preparado",
+  ESPERA_CLINICA:        "Espera clínica",
+  PRUEBA_CANCELADA:      "Prueba cancelada",
+  OTRO:                  "Otro",
+};
+
 export default async function TransferDetail({
   params,
 }: {
   params: Promise<{ id: string }> | { id: string };
 }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
+
   const resolvedParams = await Promise.resolve(params as any);
   const id = resolvedParams?.id;
-
-  if (!id) {
-    return <main className="p-6">Falta el id en la URL.</main>;
-  }
+  if (!id) return <main className="p-6">Falta el id en la URL.</main>;
 
   const transfer = await prisma.transfer.findUnique({
     where: { id },
@@ -29,126 +38,98 @@ export default async function TransferDetail({
     },
   });
 
-  if (!transfer) {
-    return <main className="p-6">Traslado no encontrado</main>;
-  }
+  if (!transfer) return <main className="p-6">Traslado no encontrado.</main>;
 
-  // 👤 Usuarios DEV (MVP)
-  const tecnico = await getOrCreateDevTecnico();
-  const celador = await getOrCreateDevCelador();
+  const isCreator = transfer.createdById === session.user.id;
+  const isFinal = transfer.status === "FINALIZADO" || transfer.status === "CANCELADO";
 
-  const isCreator = transfer.createdById === tecnico.id;
-  const isAssignedCelador = transfer.assignedToId === celador.id;
+  // Solo el técnico que creó el traslado puede ver los datos sensibles
+  const canSeeSensitiveData = isCreator;
 
-  const canSeeSensitiveData = isCreator || isAssignedCelador;
-
-  const isFinal =
-    transfer.status === "FINALIZADO" || transfer.status === "CANCELADO";
-
-  const canMarkEnLaPrueba =
-    !isFinal &&
-    (transfer.status === "EN_CAMINO_PRUEBA" || transfer.status === "EN_ESPERA");
-
+  // Estados activos según schema actual
   const canCancel =
     !isFinal &&
-    (transfer.status === "ASIGNADO" ||
-      transfer.status === "EN_CURSO" ||
-      transfer.status === "EN_CAMINO_PRUEBA" ||
-      transfer.status === "EN_ESPERA" ||
-      transfer.status === "EN_LA_PRUEBA");
-
-  const backHref = isCreator ? "/tecnico" : "/celador";
+    isCreator &&
+    ["SOLICITADO", "ASIGNADO", "EN_CURSO", "EN_PRUEBA", "PAUSADO"].includes(
+      transfer.status
+    );
 
   return (
-    <main className="p-6 space-y-6">
-      {/* VOLVER */}
-      <Link href="/tecnico" className="underline text-sm">
+    <main className="p-6 space-y-6 max-w-2xl">
+      <Link href="/tecnico" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
         ← Volver
       </Link>
 
-      {/* ======================
-          CABECERA
-      ====================== */}
-      <header className="space-y-3 border rounded p-4 relative">
-        {/* MRN */}
-        <div className="font-mono text-sm text-gray-600">
-          Nº historia: {transfer.mrn}
+      {/* ── CABECERA ── */}
+      <header className="border rounded-xl p-5 space-y-3 bg-white shadow-sm">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="space-y-1">
+            <div className="font-mono text-sm text-gray-500">
+              Nº historia: {transfer.mrn}
+            </div>
+            <div className="text-3xl font-semibold">
+              {initials(transfer.patientFullName)}
+            </div>
+            <div className="text-gray-600">
+              {transfer.location} → {transfer.testType}
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <PriorityBadge priority={transfer.priority} />
+            <StatusBadge status={transfer.status} />
+          </div>
         </div>
 
-        {/* INICIALES */}
-        <div className="text-3xl font-semibold">
-          {initials(transfer.patientFullName)}
-        </div>
-
-        {/* UBICACIÓN */}
-        <div className="text-lg text-gray-700">
-          {transfer.location} → {transfer.testType}
-        </div>
-
-        {/* BADGES */}
-        <div className="flex gap-2 flex-wrap">
-          <PriorityBadge priority={transfer.priority} />
-          <StatusBadge status={transfer.status} />
-        </div>
-
-        {/* MENSAJE FINAL */}
         {isFinal && (
-          <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Este traslado está{" "}
             {transfer.status === "CANCELADO" ? "cancelado" : "finalizado"} y no
             admite más acciones.
           </div>
         )}
 
-        {/* DATOS SENSIBLES */}
         {canSeeSensitiveData ? (
-          <div className="mt-4 border-t pt-4 space-y-1">
+          <div className="border-t pt-3 space-y-1 text-sm">
             <div>
-              <span className="font-semibold">Paciente:</span>{" "}
+              <span className="font-medium">Paciente:</span>{" "}
               {transfer.patientFullName}
             </div>
             <div>
-              <span className="font-semibold">Fecha nacimiento:</span>{" "}
+              <span className="font-medium">Fecha de nacimiento:</span>{" "}
               {transfer.dob.toLocaleDateString("es-ES")}
             </div>
           </div>
         ) : (
-          <div className="mt-4 text-sm text-gray-500 italic">
-            Datos personales ocultos. Asígnate el traslado para verlos.
-          </div>
+          <p className="text-sm text-gray-400 italic border-t pt-3">
+            Datos personales ocultos — no eres el creador de este traslado.
+          </p>
         )}
       </header>
 
-      {/* ======================
-          ACCIONES
-      ====================== */}
-      {canMarkEnLaPrueba && (
-        <form action={markEnLaPrueba}>
-          <input type="hidden" name="transferId" value={transfer.id} />
-          <button className="bg-green-600 text-white px-4 py-2 rounded">
-            Marcar “En la prueba”
-          </button>
-        </form>
-      )}
-
+      {/* ── ACCIONES ── */}
       {canCancel && (
         <CancelPruebaButton transferId={transfer.id} action={cancelPrueba} />
       )}
 
-      {/* ======================
-          INCIDENCIAS
-      ====================== */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Incidencias</h2>
+      {/* ── INCIDENCIAS ── */}
+      <section className="space-y-3">
+        <h2 className="font-semibold text-gray-800">
+          Incidencias · {transfer.incidents.length}
+        </h2>
 
         {transfer.incidents.length === 0 ? (
-          <p className="text-sm text-gray-600">No hay incidencias.</p>
+          <p className="text-sm text-gray-400 italic">Sin incidencias registradas.</p>
         ) : (
           <ul className="space-y-2">
             {transfer.incidents.map((i) => (
-              <li key={i.id} className="border rounded p-3">
-                <div className="font-mono text-sm">{i.type}</div>
-                {i.note && <div className="text-sm">{i.note}</div>}
+              <li key={i.id} className="border rounded-lg p-3 text-sm space-y-1">
+                <div className="font-medium text-gray-800">
+                  {INCIDENT_LABELS[i.type] ?? i.type}
+                </div>
+                {i.note && <div className="text-gray-600">{i.note}</div>}
+                <div className="text-xs text-gray-400">
+                  {i.createdAt.toLocaleString("es-ES")}
+                </div>
               </li>
             ))}
           </ul>
