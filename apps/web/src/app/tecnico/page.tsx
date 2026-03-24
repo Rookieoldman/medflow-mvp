@@ -95,6 +95,22 @@ export default async function TecnicoPage() {
               <option value="URGENTE">Urgente</option>
             </select>
 
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                Dificultad del traslado
+              </label>
+              <select
+                name="difficulty"
+                className="border p-2 w-full rounded"
+                defaultValue="MODERADO"
+                required
+              >
+                <option value="BANAL">🟢 Banal — Paciente autónomo, sin complicaciones</option>
+                <option value="MODERADO">🟡 Moderado — Silla / camilla, paciente estable</option>
+                <option value="CRITICO">🔴 Crítico — UCI, monitorización, cuidados intensivos</option>
+              </select>
+            </div>
+
             <button
               type="submit"
               className="bg-blue-600 text-white px-4 py-2 rounded"

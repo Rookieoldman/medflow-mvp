@@ -14,6 +14,7 @@ import {
 import SignatureModal from "@/components/SignatureModal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
+import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { initials } from "@/lib/patient";
 import ElapsedTime from "@/components/ElapsedTime";
 import LoadingInline from "@/components/LoadingInline";
@@ -26,6 +27,7 @@ type Transfer = {
   testType: string;
   priority: string;
   status: string;
+  difficulty: string;
   createdAt: string;
   requiresAcceptance?: boolean;
 };
@@ -125,7 +127,8 @@ export default function CeladorClient() {
                   <div className="text-sm text-gray-600">
                     {t.location} → {t.testType}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <DifficultyBadge difficulty={t.difficulty} />
                     <PriorityBadge priority={t.priority} />
                     <StatusBadge status={t.status} />
                   </div>
@@ -175,7 +178,8 @@ export default function CeladorClient() {
                       <div className="text-sm text-gray-600">
                         {t.location} → {t.testType}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <DifficultyBadge difficulty={t.difficulty} />
                         <PriorityBadge priority={t.priority} />
                         <StatusBadge status={t.status} />
                       </div>

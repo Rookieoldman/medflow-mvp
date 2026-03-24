@@ -18,8 +18,9 @@ export async function createTransfer(formData: FormData) {
   const dobRaw = String(formData.get("dob") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
   const testType = String(formData.get("testType") ?? "").trim();
-  const priority = String(formData.get("priority") ?? "NORMAL");
-  const scope = String(formData.get("scope") ?? "URGENCIAS");
+  const priority   = String(formData.get("priority")   ?? "NORMAL");
+  const scope      = String(formData.get("scope")      ?? "URGENCIAS");
+  const difficulty = String(formData.get("difficulty") ?? "MODERADO");
 
   if (!mrn || !lastName1 || !firstName || !dobRaw || !location || !testType) {
     throw new Error("Campos obligatorios incompletos");
@@ -42,6 +43,10 @@ export async function createTransfer(formData: FormData) {
     throw new Error("Ámbito inválido");
   }
 
+  if (!["BANAL", "MODERADO", "CRITICO"].includes(difficulty)) {
+    throw new Error("Dificultad inválida");
+  }
+
   const requiresAcceptance = scope === "PLANTA";
 
   await prisma.transfer.create({
@@ -50,9 +55,10 @@ export async function createTransfer(formData: FormData) {
       patientFullName,
       dob,
       location,
-      testType: testType as any,
-      priority: priority as any,
-      scope: scope as any,
+      testType:   testType   as any,
+      priority:   priority   as any,
+      scope:      scope      as any,
+      difficulty: difficulty as any,
       requiresAcceptance,
       status: "SOLICITADO",
       createdById: session.user.id,

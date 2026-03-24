@@ -12,22 +12,24 @@ export default function AdminFilters({ users }: { users: User[] }) {
   const router = useRouter();
   const params = useSearchParams();
 
-  const [role, setRole]         = useState(params.get("role") ?? "");
-  const [userId, setUserId]     = useState(params.get("userId") ?? "");
-  const [status, setStatus]     = useState(params.get("status") ?? "");
-  const [testType, setTestType] = useState(params.get("testType") ?? "");
+  const [role,       setRole]       = useState(params.get("role")       ?? "");
+  const [userId,     setUserId]     = useState(params.get("userId")     ?? "");
+  const [status,     setStatus]     = useState(params.get("status")     ?? "");
+  const [testType,   setTestType]   = useState(params.get("testType")   ?? "");
+  const [difficulty, setDifficulty] = useState(params.get("difficulty") ?? "");
 
   function applyFilters() {
     const sp = new URLSearchParams();
-    if (role)     sp.set("role", role);
-    if (userId)   sp.set("userId", userId);
-    if (status)   sp.set("status", status);
-    if (testType) sp.set("testType", testType);
+    if (role)       sp.set("role",       role);
+    if (userId)     sp.set("userId",     userId);
+    if (status)     sp.set("status",     status);
+    if (testType)   sp.set("testType",   testType);
+    if (difficulty) sp.set("difficulty", difficulty);
     router.push(`/admin/transfers?${sp.toString()}`);
   }
 
   function clearFilters() {
-    setRole(""); setUserId(""); setStatus(""); setTestType("");
+    setRole(""); setUserId(""); setStatus(""); setTestType(""); setDifficulty("");
     router.push("/admin/transfers");
   }
 
@@ -36,7 +38,7 @@ export default function AdminFilters({ users }: { users: User[] }) {
 
   return (
     <div className="border rounded-xl p-4 bg-white shadow-sm space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <select value={role} onChange={(e) => setRole(e.target.value)} className={selectClass}>
           <option value="">Todos los roles</option>
           <option value="TECNICO">Técnico</option>
@@ -68,6 +70,13 @@ export default function AdminFilters({ users }: { users: User[] }) {
           <option value="RX">RX</option>
           <option value="ECO">ECO</option>
           <option value="MEDICINA_NUCLEAR">Medicina Nuclear</option>
+        </select>
+
+        <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={selectClass}>
+          <option value="">Todas las dificultades</option>
+          <option value="BANAL">🟢 Banal</option>
+          <option value="MODERADO">🟡 Moderado</option>
+          <option value="CRITICO">🔴 Crítico</option>
         </select>
       </div>
 

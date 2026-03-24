@@ -46,9 +46,9 @@ model Transfer {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  // 👇 NUEVO
-  scope               TransferScope @default(PLANTA)
-  requiresAcceptance  Boolean       @default(true)
+  scope               TransferScope      @default(PLANTA)
+  requiresAcceptance  Boolean            @default(true)
+  difficulty          TransferDifficulty @default(MODERADO)
 
   previousStatus      TransferStatus?
   createdById         String
@@ -108,6 +108,12 @@ enum TransferStatus {
   FINALIZADO
   PAUSADO
   CANCELADO
+}
+
+enum TransferDifficulty {
+  BANAL
+  MODERADO
+  CRITICO
 }
 
 enum IncidentType {
