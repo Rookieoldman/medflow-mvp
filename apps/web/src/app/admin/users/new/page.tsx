@@ -3,7 +3,21 @@ import { createUser } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default function NewUserPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  email_duplicado: "Este email ya está registrado. Usa uno diferente.",
+  campos_requeridos: "Email, contraseña y rol son obligatorios.",
+  rol_invalido: "El rol seleccionado no es válido.",
+};
+
+export default async function NewUserPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; email?: string }> | { error?: string; email?: string };
+}) {
+  const params = await Promise.resolve(searchParams as any);
+  const errorMsg = params?.error ? ERROR_MESSAGES[params.error] : null;
+  const prefillEmail = params?.email ?? "";
+
   return (
     <div className="max-w-xl space-y-6">
       <Link href="/admin/users" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
@@ -14,6 +28,12 @@ export default function NewUserPage() {
         <h1 className="text-xl font-semibold">Crear usuario</h1>
         <p className="text-sm text-gray-500 mt-1">Rellena los datos del nuevo usuario.</p>
       </div>
+
+      {errorMsg && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMsg}
+        </div>
+      )}
 
       <form action={createUser} className="space-y-5 border rounded-xl p-6 shadow-sm bg-white">
 
@@ -56,14 +76,15 @@ export default function NewUserPage() {
           <legend className="text-sm font-medium text-gray-700">Credenciales de acceso</legend>
           <div className="space-y-1">
             <label htmlFor="email" className="text-xs text-gray-500">Email <span className="text-red-500">*</span></label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="usuario@medflow.dev"
-              className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
-              required
-            />
+              <input
+                id="email"
+                name="email"
+                type="email"
+                defaultValue={prefillEmail}
+                placeholder="usuario@medflow.dev"
+                className="border rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                required
+              />
           </div>
           <div className="space-y-1">
             <label htmlFor="password" className="text-xs text-gray-500">Contraseña <span className="text-red-500">*</span></label>

@@ -67,7 +67,7 @@ export default async function UserStatsPage({
   today.setHours(0, 0, 0, 0);
 
   const todayTransfers = assignedTransfers.filter(
-    (t) => t.createdAt >= today
+    (t) => t.updatedAt >= today
   ).length;
 
   // ======================

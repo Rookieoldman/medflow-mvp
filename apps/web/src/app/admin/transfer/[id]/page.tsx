@@ -1,20 +1,35 @@
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  SOLICITADO: { label: "Solicitado", color: "bg-amber-100 text-amber-800" },
+  ASIGNADO:   { label: "Asignado",   color: "bg-blue-100 text-blue-800"   },
+  EN_CURSO:   { label: "En curso",   color: "bg-indigo-100 text-indigo-800" },
+  EN_PRUEBA:  { label: "En prueba",  color: "bg-purple-100 text-purple-800" },
+  PAUSADO:    { label: "Pausado",    color: "bg-gray-100 text-gray-700"   },
+  FINALIZADO: { label: "Finalizado", color: "bg-green-100 text-green-800"  },
+  CANCELADO:  { label: "Cancelado",  color: "bg-red-100 text-red-700"     },
+};
+
+const INCIDENT_LABELS: Record<string, string> = {
+  PACIENTE_NO_PREPARADO: "Paciente no preparado",
+  ESPERA_CLINICA:        "Espera clínica",
+  PRUEBA_CANCELADA:      "Prueba cancelada",
+  OTRO:                  "Otro",
+};
 
 export default async function AdminTransferDetail({
   params,
 }: {
   params: Promise<{ id: string }> | { id: string };
 }) {
-  // 🔑 Resolver params (Next 16 + Turbopack)
   const resolvedParams = await Promise.resolve(params as any);
   const id = resolvedParams?.id;
 
-  if (!id) {
-    return <main className="p-6">Falta el id en la URL.</main>;
-  }
+  if (!id) return <p className="text-sm text-gray-500">Falta el id en la URL.</p>;
 
   const transfer = await prisma.transfer.findUnique({
     where: { id },
@@ -29,135 +44,135 @@ export default async function AdminTransferDetail({
     },
   });
 
-  if (!transfer) {
-    return <main className="p-6">Traslado no encontrado</main>;
-  }
+  if (!transfer) return <p className="text-sm text-gray-500">Traslado no encontrado.</p>;
 
+  const statusCfg = STATUS_LABELS[transfer.status] ?? { label: transfer.status, color: "bg-gray-100 text-gray-700" };
 
   return (
-    <main className="p-6 space-y-8">
-      <a href="/admin" className="underline text-sm">
-        ← Volver a admin
-      </a>
+    <div className="space-y-5 max-w-3xl">
+      <Link
+        href="/admin/transfers"
+        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+      >
+        ← Volver a traslados
+      </Link>
 
-      {/* ===== DATOS DEL TRASLADO ===== */}
-      <section className="space-y-2">
-        <h1 className="text-xl font-semibold">Detalle del traslado</h1>
-
-        <div className="grid grid-cols-2 gap-4 text-sm">
+      {/* ── CABECERA ── */}
+      <div className="border rounded-xl p-5 bg-white shadow-sm space-y-1">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <strong>Nº historia:</strong> {transfer.mrn}
+            <h1 className="text-xl font-semibold text-gray-900">{transfer.patientFullName}</h1>
+            <p className="text-sm text-gray-500 font-mono">{transfer.mrn}</p>
           </div>
-          <div>
-            <strong>Paciente:</strong> {transfer.patientFullName}
-          </div>
-          <div>
-            <strong>Fecha nacimiento:</strong>{" "}
-            {transfer.dob.toLocaleDateString()}
-          </div>
-          <div>
-            <strong>Ubicación:</strong> {transfer.location}
-          </div>
-          <div>
-            <strong>Tipo de prueba:</strong> {transfer.testType}
-          </div>
-          <div>
-            <strong>Prioridad:</strong> {transfer.priority}
-          </div>
-          <div>
-            <strong>Estado:</strong> {transfer.status}
-          </div>
-          <div>
-            <strong>Creado:</strong>{" "}
-            {transfer.createdAt.toLocaleString()}
-          </div>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium shrink-0 ${statusCfg.color}`}>
+            {statusCfg.label}
+          </span>
         </div>
-      </section>
+      </div>
 
-      {/* ===== RESPONSABLES ===== */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Responsables</h2>
-
-        <div className="text-sm">
-          <div>
-            <strong>Técnico:</strong> {transfer.createdBy.email}
-          </div>
-
-          {transfer.assignedTo ? (
-            <div>
-              <strong>Celador:</strong> {transfer.assignedTo.email}
-            </div>
-          ) : (
-            <div className="text-gray-500">Sin celador asignado</div>
-          )}
+      <div className="grid grid-cols-2 gap-4">
+        {/* ── DATOS CLÍNICOS ── */}
+        <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Datos clínicos</h2>
+          <dl className="space-y-2 text-sm">
+            <Row label="Fecha de nacimiento" value={transfer.dob.toLocaleDateString("es-ES")} />
+            <Row label="Ubicación" value={transfer.location} />
+            <Row label="Tipo de prueba" value={transfer.testType} />
+            <Row
+              label="Prioridad"
+              value={
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  transfer.priority === "URGENTE"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-gray-100 text-gray-600"
+                }`}>
+                  {transfer.priority}
+                </span>
+              }
+            />
+            <Row label="Creado" value={transfer.createdAt.toLocaleString("es-ES")} />
+          </dl>
         </div>
-      </section>
 
-      {/* ===== FIRMA / ACEPTACIÓN ===== */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Aceptación del traslado</h2>
+        {/* ── RESPONSABLES ── */}
+        <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsables</h2>
+          <dl className="space-y-2 text-sm">
+            <Row label="Técnico" value={transfer.createdBy.email} />
+            <Row
+              label="Celador"
+              value={transfer.assignedTo?.email ?? <span className="text-gray-400 italic">Sin asignar</span>}
+            />
+          </dl>
+        </div>
+      </div>
 
+      {/* ── ACEPTACIÓN / FIRMA ── */}
+      <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aceptación del traslado</h2>
         {!transfer.acceptance ? (
-          <p className="text-sm text-gray-600">
-            El traslado no ha sido aceptado todavía.
-          </p>
+          <p className="text-sm text-gray-400 italic">Pendiente de aceptación.</p>
         ) : (
-          <div className="space-y-2 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <dl className="space-y-2">
+              <Row label="Firmante" value={transfer.acceptance.signerName} />
+              {transfer.acceptance.signerRole && (
+                <Row label="Rol firmante" value={transfer.acceptance.signerRole} />
+              )}
+              <Row label="Fecha de firma" value={transfer.acceptance.signedAt.toLocaleString("es-ES")} />
+            </dl>
             <div>
-              <strong>Firmante:</strong> {transfer.acceptance.signerName}
-            </div>
-            {transfer.acceptance.signerRole && (
-              <div>
-                <strong>Rol:</strong> {transfer.acceptance.signerRole}
-              </div>
-            )}
-            <div>
-              <strong>Fecha firma:</strong>{" "}
-              {transfer.acceptance.signedAt.toLocaleString()}
-            </div>
-
-            {/* Firma */}
-            <div>
-              <strong>Firma:</strong>
-              <div className="border mt-2 p-2 inline-block bg-white">
+              <p className="text-xs text-gray-500 mb-2">Firma</p>
+              <div className="border rounded-lg p-2 bg-gray-50 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={transfer.acceptance.signatureData}
-                  alt="Firma"
-                  className="max-h-32"
+                  alt="Firma del responsable"
+                  className="max-h-24"
                 />
               </div>
             </div>
           </div>
         )}
-      </section>
+      </div>
 
-      {/* ===== INCIDENCIAS ===== */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Incidencias</h2>
-
+      {/* ── INCIDENCIAS ── */}
+      <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Incidencias · {transfer.incidents.length}
+        </h2>
         {transfer.incidents.length === 0 ? (
-          <p className="text-sm text-gray-600">No hay incidencias.</p>
+          <p className="text-sm text-gray-400 italic">Sin incidencias registradas.</p>
         ) : (
           <ul className="space-y-2">
             {transfer.incidents.map((i) => (
-              <li key={i.id} className="border rounded p-3 text-sm">
-                <div>
-                  <strong>Tipo:</strong> {i.type}
+              <li key={i.id} className="border rounded-lg p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-800">
+                    {INCIDENT_LABELS[i.type] ?? i.type}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {i.createdAt.toLocaleString("es-ES")}
+                  </span>
                 </div>
-                {i.note && (
-                  <div>
-                    <strong>Nota:</strong> {i.note}
-                  </div>
+                {i.note && <p className="text-gray-600 text-sm">{i.note}</p>}
+                {i.createdBy && (
+                  <p className="text-xs text-gray-400">{i.createdBy.email}</p>
                 )}
-                <div className="text-xs text-gray-500">
-                  {i.createdAt.toLocaleString()}
-                  {i.createdBy && ` · ${i.createdBy.email}`}
-                </div>
               </li>
             ))}
           </ul>
         )}
-      </section>
-    </main>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <dt className="text-gray-400 shrink-0">{label}</dt>
+      <dd className="text-gray-800 text-right">{value}</dd>
+    </div>
   );
 }

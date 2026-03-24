@@ -1,20 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { isAtRisk } from "@/lib/sla";
 import DashboardClient from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const ACTIVE_STATUSES = ["SOLICITADO", "ASIGNADO", "EN_CURSO", "EN_PRUEBA", "PAUSADO"];
-
-function isAtRisk(status: string, minutesOpen: number, priority: string) {
-  if (priority === "URGENTE" && minutesOpen > 5) return true;
-  if (status === "SOLICITADO" && minutesOpen > 15) return true;
-  if (status === "ASIGNADO" && minutesOpen > 10) return true;
-  if (status === "EN_CURSO" && minutesOpen > 30) return true;
-  if (status === "EN_PRUEBA" && minutesOpen > 60) return true;
-  if (status === "PAUSADO" && minutesOpen > 15) return true;
-  return false;
-}
 
 export default async function AdminDashboardPage() {
   const now = new Date();

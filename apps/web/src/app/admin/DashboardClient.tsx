@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { getSLABadge } from "@/lib/sla";
 
 type Transfer = {
   id: string;
@@ -35,16 +36,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 function getSLAInfo(t: Transfer, now: number) {
   const minutes = (now - new Date(t.createdAt).getTime()) / 60000;
-
-  if (t.priority === "URGENTE") {
-    if (minutes > 5) return { label: "En riesgo", color: "bg-red-500 text-white", risk: true };
-    if (minutes > 3) return { label: "Atención",  color: "bg-yellow-400 text-yellow-900", risk: false };
-    return { label: "OK", color: "bg-green-500 text-white", risk: false };
-  }
-
-  if (minutes > 15) return { label: "En riesgo", color: "bg-red-500 text-white", risk: true };
-  if (minutes > 10) return { label: "Atención",  color: "bg-yellow-400 text-yellow-900", risk: false };
-  return { label: "OK", color: "bg-green-500 text-white", risk: false };
+  return getSLABadge(t.status, minutes, t.priority);
 }
 
 function formatElapsed(createdAt: string, now: number) {
