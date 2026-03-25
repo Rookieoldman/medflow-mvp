@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
+import { emitTransferEvent } from "@/lib/eventBus";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
@@ -67,6 +68,16 @@ export async function createTransfer(formData: FormData) {
   });
 
   await recordEvent(transfer.id, session.user.id, "SOLICITADO", undefined, "Traslado creado");
+
+  emitTransferEvent({
+    type:        "transfer:new",
+    transferId:  transfer.id,
+    status:      "SOLICITADO",
+    tecnicoId:   session.user.id,
+    patientName: patientFullName,
+    mrn,
+    location,
+  });
 
   redirect("/tecnico");
 }

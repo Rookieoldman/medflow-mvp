@@ -2,14 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
+import { emitTransferEvent } from "@/lib/eventBus";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { TransferStatus } from "@prisma/client";
 
 const ALLOWED_TRANSITIONS: Record<string, TransferStatus> = {
-  EN_CURSO:  "EN_PRUEBA",
-  EN_PRUEBA: "FINALIZADO",
+  EN_CURSO: "EN_PRUEBA",
 };
 
 export async function setTransferStatus(formData: FormData) {
@@ -36,11 +36,20 @@ export async function setTransferStatus(formData: FormData) {
   });
 
   const NOTE: Record<string, string> = {
-    EN_PRUEBA:  "Paciente en la sala de prueba",
-    FINALIZADO: "Prueba finalizada por el técnico",
+    EN_PRUEBA: "Paciente en la sala de prueba",
   };
 
   await recordEvent(transferId, tecnicoId, next, transfer.status, NOTE[next]);
+
+  emitTransferEvent({
+    type:       "transfer:status",
+    transferId,
+    status:     next,
+    tecnicoId,
+    celadorId:  transfer.assignedToId ?? undefined,
+    mrn:        transfer.mrn,
+    patientName: transfer.patientFullName,
+  });
 
   revalidatePath("/tecnico");
   revalidatePath(`/tecnico/transfers/${transferId}`);

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
+import { emitTransferEvent } from "@/lib/eventBus";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { revalidatePath } from "next/cache";
@@ -44,6 +45,16 @@ export async function assignTransfer(formData: FormData) {
     transfer.status,
     "Asignado manualmente por admin"
   );
+
+  emitTransferEvent({
+    type:       "transfer:assigned",
+    transferId,
+    status:     nextStatus,
+    celadorId,
+    tecnicoId:  transfer.createdById,
+    mrn:        transfer.mrn,
+    patientName: transfer.patientFullName,
+  });
 
   revalidatePath(`/admin/transfer/${transferId}`);
   revalidatePath("/admin/transfers");

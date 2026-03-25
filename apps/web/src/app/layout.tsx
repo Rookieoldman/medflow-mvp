@@ -2,6 +2,7 @@ import "./globals.css";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import LogoutButton from "@/components/LogoutButton";
+import Toaster from "@/components/Toaster";
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN:   "Admin",
@@ -45,6 +46,7 @@ export default async function RootLayout({
         )}
 
         <div className="min-h-[calc(100vh-57px)]">{children}</div>
+        {session && <Toaster />}
       </body>
     </html>
   );

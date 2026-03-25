@@ -46,7 +46,7 @@ const STATUS_CTX: Record<string, string> = {
   ASIGNADO:  "Pendiente de firma del responsable",
   EN_CURSO:  "Traslado en curso",
   PAUSADO:   "Traslado pausado",
-  EN_PRUEBA: "Paciente en la sala — esperando al técnico",
+  EN_PRUEBA: "Paciente en la sala — prueba en curso",
 };
 
 const BTN = "border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
@@ -58,7 +58,7 @@ export default function CeladorClient() {
   const [openSig,   setOpenSig]   = useState<string | null>(null);
 
   useEffect(() => {
-    const fetch_ = async () => {
+    const fetchData = async () => {
       const res = await fetch("/api/celador/transfers");
       if (!res.ok) return;
       const data = await res.json();
@@ -71,9 +71,24 @@ export default function CeladorClient() {
         if (!exists) setPendingId(null);
       }
     };
-    fetch_();
-    const t = setInterval(fetch_, 5000);
-    return () => clearInterval(t);
+
+    fetchData();
+    // Polling de respaldo cada 10 s
+    const poll = setInterval(fetchData, 10_000);
+
+    // SSE: refresco inmediato cuando llega cualquier evento relevante
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type !== "connected") fetchData();
+      } catch { /* ignorar */ }
+    };
+
+    return () => {
+      clearInterval(poll);
+      es.close();
+    };
   }, [pendingId]);
 
   const run = async (
@@ -177,7 +192,6 @@ export default function CeladorClient() {
           <div className="space-y-3">
             {mine.map((t) => {
               const disabled = pendingId === t.id;
-              const isReadOnly = t.status === "EN_PRUEBA"; // técnico tiene el control
 
               return (
                 <div
@@ -216,8 +230,8 @@ export default function CeladorClient() {
                     )}
                   </div>
 
-                  {/* Acciones de transporte — solo si no está en manos del técnico */}
-                  {!isReadOnly && (
+                  {/* Acciones de transporte */}
+                  {t.status !== "EN_PRUEBA" && (
                     <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl flex flex-wrap gap-2">
                       {/* Firma */}
                       {t.status === "ASIGNADO" && t.requiresAcceptance && (
@@ -241,12 +255,19 @@ export default function CeladorClient() {
                     </div>
                   )}
 
-                  {/* EN_PRUEBA — aviso de que el técnico tiene el control */}
-                  {isReadOnly && (
-                    <div className="px-4 py-3 border-t border-violet-100 bg-violet-50 rounded-b-xl">
+                  {/* EN_PRUEBA — el celador finaliza el traslado */}
+                  {t.status === "EN_PRUEBA" && (
+                    <div className="px-4 py-3 border-t border-violet-100 bg-violet-50 rounded-b-xl space-y-2">
                       <p className="text-xs text-violet-700 font-medium">
-                        🔬 El técnico está realizando la prueba — sin acciones disponibles
+                        🔬 Técnico realizando la prueba — confirma cuando haya terminado
                       </p>
+                      <button
+                        disabled={disabled}
+                        onClick={() => run(t.id, setStatus, (fd) => fd.set("next", "FINALIZADO"))}
+                        className="w-full bg-green-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-green-700 disabled:opacity-40 transition-colors"
+                      >
+                        {disabled ? "Finalizando…" : "✓ Finalizar traslado"}
+                      </button>
                     </div>
                   )}
                 </div>

@@ -114,30 +114,34 @@ function TransferCard({
         )}
       </div>
 
-      {/* ── ACCIONES ── */}
-      {(t.status === "EN_CURSO" || t.status === "EN_PRUEBA") && (
+      {/* ── ACCIÓN técnico: solo EN_CURSO → EN_PRUEBA ── */}
+      {t.status === "EN_CURSO" && (
         <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-2">
-          {t.status === "EN_CURSO" && (
-            <button
-              disabled={pending}
-              onClick={() => doAction("EN_PRUEBA")}
-              className="flex-1 sm:flex-none bg-violet-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-violet-700 disabled:opacity-50 transition-colors"
-            >
-              {pending ? "…" : "✓ Paciente en la sala"}
-            </button>
-          )}
-          {t.status === "EN_PRUEBA" && (
-            <button
-              disabled={pending}
-              onClick={() => doAction("FINALIZADO")}
-              className="flex-1 sm:flex-none bg-green-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-green-700 disabled:opacity-50 transition-colors"
-            >
-              {pending ? "…" : "✓ Prueba finalizada"}
-            </button>
-          )}
+          <button
+            disabled={pending}
+            onClick={() => doAction("EN_PRUEBA")}
+            className="flex-1 sm:flex-none bg-violet-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-violet-700 disabled:opacity-50 transition-colors"
+          >
+            {pending ? "…" : "✓ Paciente en la sala"}
+          </button>
           <Link
             href={`/tecnico/transfers/${t.id}`}
             className="text-xs font-medium text-gray-400 hover:text-gray-700 self-center px-2"
+          >
+            Detalle →
+          </Link>
+        </div>
+      )}
+
+      {/* EN_PRUEBA — el celador finaliza */}
+      {t.status === "EN_PRUEBA" && (
+        <div className="px-4 py-3 border-t border-violet-100 bg-violet-50 flex items-center justify-between gap-2">
+          <p className="text-xs text-violet-700 font-medium">
+            🔬 Prueba en curso — el celador finalizará el traslado
+          </p>
+          <Link
+            href={`/tecnico/transfers/${t.id}`}
+            className="text-xs font-medium text-violet-600 hover:text-violet-800 shrink-0"
           >
             Detalle →
           </Link>
@@ -173,8 +177,22 @@ export default function TecnicoClient() {
 
   useEffect(() => {
     fetchTransfers();
-    intervalRef.current = setInterval(fetchTransfers, 10000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    // Polling de respaldo cada 15 s
+    intervalRef.current = setInterval(fetchTransfers, 15_000);
+
+    // SSE: refresco inmediato al recibir cualquier evento
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type !== "connected") fetchTransfers();
+      } catch { /* ignorar */ }
+    };
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      es.close();
+    };
   }, []);
 
   /* Refetch después de una acción sin esperar el intervalo */
@@ -201,9 +219,9 @@ export default function TecnicoClient() {
     );
   }
 
-  /* Separar por grupo de acción */
-  const needsAction = transfers.filter((t) => t.status === "EN_CURSO" || t.status === "EN_PRUEBA");
-  const waiting     = transfers.filter((t) => t.status !== "EN_CURSO" && t.status !== "EN_PRUEBA");
+  /* Separar por grupo de acción: solo EN_CURSO requiere acción del técnico */
+  const needsAction = transfers.filter((t) => t.status === "EN_CURSO");
+  const waiting     = transfers.filter((t) => t.status !== "EN_CURSO");
 
   return (
     <div className="space-y-5">

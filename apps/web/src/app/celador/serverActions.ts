@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
+import { emitTransferEvent } from "@/lib/eventBus";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
@@ -19,12 +20,13 @@ CANCELADO
 PAUSADO
 */
 
-// EN_PRUEBA y FINALIZADO son responsabilidad del TÉCNICO, no del celador
+// EN_PRUEBA lo marca el técnico; FINALIZADO lo marca el celador
 const ALLOWED: Record<string, string[]> = {
   SOLICITADO: ["ASIGNADO", "EN_CURSO"],
   ASIGNADO:   ["EN_CURSO"],
   EN_CURSO:   ["PAUSADO"],
   PAUSADO:    ["EN_CURSO"],
+  EN_PRUEBA:  ["FINALIZADO"],
 };
 
 /* ============================================================
@@ -70,6 +72,16 @@ export async function assignToMe(formData: FormData) {
 
   await recordEvent(transferId, celadorId, nextStatus, transfer.status);
 
+  emitTransferEvent({
+    type:       "transfer:assigned",
+    transferId,
+    status:     nextStatus,
+    celadorId,
+    tecnicoId:  transfer.createdById,
+    mrn:        transfer.mrn,
+    patientName: transfer.patientFullName,
+  });
+
   revalidatePath("/celador");
 }
 
@@ -109,6 +121,16 @@ export async function setStatus(formData: FormData) {
   });
 
   await recordEvent(transferId, celadorId, next as any, transfer.status);
+
+  emitTransferEvent({
+    type:       "transfer:status",
+    transferId,
+    status:     next,
+    celadorId,
+    tecnicoId:  transfer.createdById,
+    mrn:        transfer.mrn,
+    patientName: transfer.patientFullName,
+  });
 
   revalidatePath("/celador");
 }
