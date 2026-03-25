@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   assignToMe,
@@ -10,6 +10,7 @@ import {
   resumeTransfer,
   acceptTransfer,
 } from "./serverActions";
+import { startBreak, endBreak } from "./breakActions";
 
 import SignatureModal  from "@/components/SignatureModal";
 import { PriorityBadge }   from "@/components/PriorityBadge";
@@ -18,6 +19,24 @@ import { StatusBadge }     from "@/components/StatusBadge";
 import { EmptyState }      from "@/components/ui";
 import LoadingInline from "@/components/LoadingInline";
 import ElapsedTime   from "@/components/ElapsedTime";
+
+/* ── Countdown del descanso ── */
+function BreakCountdown({ breakUntil }: { breakUntil: string }) {
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(0, Math.floor((new Date(breakUntil).getTime() - Date.now()) / 1000))
+  );
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setRemaining((r) => Math.max(0, r - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const m = Math.floor(remaining / 60).toString().padStart(2, "0");
+  const s = (remaining % 60).toString().padStart(2, "0");
+  return <span className="font-mono font-bold tabular-nums">{m}:{s}</span>;
+}
 
 type Transfer = {
   id:                string;
@@ -52,10 +71,15 @@ const STATUS_CTX: Record<string, string> = {
 const BTN = "border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
 
 export default function CeladorClient() {
-  const [available, setAvailable] = useState<Transfer[]>([]);
-  const [mine,      setMine]      = useState<Transfer[]>([]);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [openSig,   setOpenSig]   = useState<string | null>(null);
+  const [available,  setAvailable]  = useState<Transfer[]>([]);
+  const [mine,       setMine]       = useState<Transfer[]>([]);
+  const [pendingId,  setPendingId]  = useState<string | null>(null);
+  const [openSig,    setOpenSig]    = useState<string | null>(null);
+  const [onBreak,       setOnBreak]       = useState(false);
+  const [breakUntil,    setBreakUntil]    = useState<string | null>(null);
+  const [breakAvailable, setBreakAvailable] = useState(true);
+  const [breakPending,  startBreakTransition] = useTransition();
+  const breakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -64,6 +88,9 @@ export default function CeladorClient() {
       const data = await res.json();
       setAvailable(data.available ?? []);
       setMine(data.mine ?? []);
+      setOnBreak(data.onBreak ?? false);
+      setBreakUntil(data.breakUntil ?? null);
+      setBreakAvailable(data.breakAvailable ?? true);
       if (pendingId) {
         const exists =
           data.available?.some((t: Transfer) => t.id === pendingId) ||
@@ -105,8 +132,68 @@ export default function CeladorClient() {
     setTimeout(() => setPendingId(null), 2000);
   };
 
+  function handleBreakToggle() {
+    startBreakTransition(async () => {
+      if (onBreak) {
+        await endBreak();
+        setOnBreak(false);
+        setBreakUntil(null);
+        if (breakTimerRef.current) clearTimeout(breakTimerRef.current);
+      } else {
+        await startBreak();
+        const until = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+        setOnBreak(true);
+        setBreakUntil(until);
+        setBreakAvailable(false);
+        // Auto-clear local state cuando el descanso expire
+        if (breakTimerRef.current) clearTimeout(breakTimerRef.current);
+        breakTimerRef.current = setTimeout(() => {
+          setOnBreak(false);
+          setBreakUntil(null);
+        }, 20 * 60 * 1000);
+      }
+    });
+  }
+
   return (
     <>
+      {/* ════════════════════════════════════════
+          ESTADO DE DESCANSO
+      ════════════════════════════════════════ */}
+      {onBreak && breakUntil ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold text-amber-800">☕ En descanso</p>
+            <p className="text-xs text-amber-600">
+              No recibirás traslados — quedan <BreakCountdown breakUntil={breakUntil} />
+            </p>
+          </div>
+          <button
+            disabled={breakPending}
+            onClick={handleBreakToggle}
+            className="shrink-0 border border-amber-300 bg-white text-amber-700 text-xs font-medium rounded-lg px-3 py-2 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+          >
+            Volver antes
+          </button>
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          {breakAvailable ? (
+            <button
+              disabled={breakPending || !!pendingId}
+              onClick={handleBreakToggle}
+              className="border border-gray-200 text-gray-500 text-xs font-medium rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            >
+              ☕ Iniciar descanso (20 min)
+            </button>
+          ) : (
+            <span className="text-xs text-gray-400 italic">
+              ✓ Descanso ya utilizado hoy
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ════════════════════════════════════════
           DISPONIBLES — tarjetas tipo "solicitud"
       ════════════════════════════════════════ */}
@@ -162,11 +249,11 @@ export default function CeladorClient() {
                 {/* CTA */}
                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl">
                   <button
-                    disabled={!!pendingId}
+                    disabled={!!pendingId || onBreak}
                     onClick={() => run(t.id, assignToMe)}
                     className="w-full bg-gray-900 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-gray-700 disabled:opacity-40 transition-colors"
                   >
-                    {pendingId === t.id ? "Asignando…" : "Asignarme este traslado"}
+                    {onBreak ? "☕ En descanso" : pendingId === t.id ? "Asignando…" : "Asignarme este traslado"}
                   </button>
                 </div>
               </div>

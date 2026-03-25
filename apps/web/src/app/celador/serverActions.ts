@@ -53,6 +53,15 @@ export async function assignToMe(formData: FormData) {
 
   const celadorId = await getCeladorSession();
 
+  // Verificar que el celador no está de descanso
+  const celadorUser = await prisma.user.findUnique({
+    where:  { id: celadorId },
+    select: { breakUntil: true },
+  });
+  if (celadorUser?.breakUntil && celadorUser.breakUntil > new Date()) {
+    throw new Error("No puedes asignarte traslados durante el descanso");
+  }
+
   const transfer = await prisma.transfer.findUnique({
     where: { id: transferId },
   });

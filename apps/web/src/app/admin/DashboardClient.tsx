@@ -16,12 +16,20 @@ type Transfer = {
 
 type StatusEntry = { status: string; count: number };
 
+type CeladorEntry = {
+  id:         string;
+  name:       string;
+  onBreak:    boolean;
+  breakUntil: string | null;
+};
+
 type Props = {
   transfers:       Transfer[];
   total:           number;
   riskCount:       number;
   slaPercent:      number;
   statusBreakdown: StatusEntry[];
+  celadores:       CeladorEntry[];
 };
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
@@ -65,6 +73,7 @@ export default function DashboardClient({
   riskCount: initialRiskCount,
   slaPercent: initialSla,
   statusBreakdown,
+  celadores,
 }: Props) {
   const [now, setNow] = useState(Date.now());
 
@@ -107,6 +116,47 @@ export default function DashboardClient({
           <p className="text-xs text-gray-400 mt-1">en tiempo real · actualiza c/10s</p>
         </div>
       </div>
+
+      {/* ── DISPONIBILIDAD CELADORES ── */}
+      {celadores.length > 0 && (
+        <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Celadores disponibles
+            </h2>
+            <span className="text-xs text-gray-400">
+              {celadores.filter((c) => !c.onBreak || (c.breakUntil && new Date(c.breakUntil) <= new Date(now))).length}
+              &nbsp;/&nbsp;{celadores.length} disponibles
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {celadores.map((c) => {
+              const isOnBreak = c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now);
+              const secsLeft  = isOnBreak
+                ? Math.max(0, Math.floor((new Date(c.breakUntil!).getTime() - now) / 1000))
+                : 0;
+              const mm = Math.floor(secsLeft / 60).toString().padStart(2, "0");
+              const ss = (secsLeft % 60).toString().padStart(2, "0");
+
+              return (
+                <div key={c.id} className="flex items-center justify-between px-5 py-2.5 gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isOnBreak ? "bg-amber-400" : "bg-green-500"}`} />
+                    <span className="text-sm text-gray-800 font-medium truncate">{c.name}</span>
+                  </div>
+                  {isOnBreak ? (
+                    <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">
+                      ☕ Descanso — {mm}:{ss}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-green-600 font-medium shrink-0">Disponible</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── ALERTAS SLA ── */}
       {liveRiskList.length > 0 && (

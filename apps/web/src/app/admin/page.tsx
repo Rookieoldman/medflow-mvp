@@ -11,6 +11,12 @@ export default async function AdminDashboardPage() {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  const celadores = await prisma.user.findMany({
+    where:   { role: "CELADOR", active: true },
+    select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true },
+    orderBy: { firstName: "asc" },
+  });
+
   const raw = await prisma.transfer.findMany({
     where: {
       createdAt: { gte: todayStart },
@@ -48,6 +54,13 @@ export default async function AdminDashboardPage() {
     count: transfers.filter((t) => t.status === s).length,
   }));
 
+  const celadorStatus = celadores.map((c) => ({
+    id:        c.id,
+    name:      [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
+    onBreak:   !!(c.breakUntil && c.breakUntil > now),
+    breakUntil: c.breakUntil?.toISOString() ?? null,
+  }));
+
   return (
     <DashboardClient
       transfers={transfers}
@@ -55,6 +68,7 @@ export default async function AdminDashboardPage() {
       riskCount={riskCount}
       slaPercent={slaPercent}
       statusBreakdown={statusBreakdown}
+      celadores={celadorStatus}
     />
   );
 }

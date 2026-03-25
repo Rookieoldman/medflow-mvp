@@ -22,6 +22,15 @@ export async function assignTransfer(formData: FormData) {
 
   if (!transferId || !celadorId) throw new Error("Faltan parámetros");
 
+  // Verificar que el celador no está de descanso
+  const celador = await prisma.user.findUnique({
+    where:  { id: celadorId },
+    select: { breakUntil: true },
+  });
+  if (celador?.breakUntil && celador.breakUntil > new Date()) {
+    throw new Error("El celador está de descanso y no puede recibir traslados");
+  }
+
   const transfer = await prisma.transfer.findUnique({ where: { id: transferId } });
   if (!transfer) throw new Error("Traslado no encontrado");
 

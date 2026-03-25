@@ -2,14 +2,15 @@ import UserActions from "./UserActions";
 import { fDate } from "@/lib/format";
 
 type User = {
-  id:        string;
-  email:     string;
-  role:      string;
-  firstName: string | null;
-  lastName1: string | null;
-  lastName2: string | null;
-  active:    boolean;
-  createdAt: Date;
+  id:         string;
+  email:      string;
+  role:       string;
+  firstName:  string | null;
+  lastName1:  string | null;
+  lastName2:  string | null;
+  active:     boolean;
+  createdAt:  Date;
+  breakUntil: Date | null;
 };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -25,8 +26,8 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export default function UserRow({ user }: { user: User }) {
-  const fullName = [user.firstName, user.lastName1, user.lastName2]
-    .filter(Boolean).join(" ");
+  const fullName  = [user.firstName, user.lastName1, user.lastName2].filter(Boolean).join(" ");
+  const onBreak   = user.role === "CELADOR" && !!(user.breakUntil && user.breakUntil > new Date());
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
@@ -51,15 +52,20 @@ export default function UserRow({ user }: { user: User }) {
       </td>
 
       <td className="px-4 py-3">
-        {user.active ? (
-          <span className="flex items-center gap-1.5 text-green-700 font-medium text-xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-            <span className="hidden sm:inline">Activo</span>
-          </span>
-        ) : (
+        {!user.active ? (
           <span className="flex items-center gap-1.5 text-gray-400 text-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
             <span className="hidden sm:inline">Inactivo</span>
+          </span>
+        ) : onBreak ? (
+          <span className="flex items-center gap-1.5 text-amber-600 font-medium text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+            ☕ Descanso
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-green-700 font-medium text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+            <span className="hidden sm:inline">Activo</span>
           </span>
         )}
       </td>

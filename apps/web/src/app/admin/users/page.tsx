@@ -22,8 +22,13 @@ export default async function AdminUsersPage({
 
   const [users, roleCounts] = await Promise.all([
     prisma.user.findMany({
-      where: activeRole ? { role: activeRole as any } : undefined,
+      where:   activeRole ? { role: activeRole as any } : undefined,
       orderBy: [{ role: "asc" }, { lastName1: "asc" }],
+      select:  {
+        id: true, email: true, role: true, firstName: true,
+        lastName1: true, lastName2: true, active: true,
+        createdAt: true, breakUntil: true,
+      },
     }),
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
   ]);

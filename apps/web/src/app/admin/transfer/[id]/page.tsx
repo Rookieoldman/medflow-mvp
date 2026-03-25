@@ -43,7 +43,11 @@ export default async function AdminTransferDetail({
         },
       },
     }),
-    prisma.user.findMany({ where: { role: "CELADOR", active: true }, orderBy: { firstName: "asc" } }),
+    prisma.user.findMany({
+      where:   { role: "CELADOR", active: true },
+      orderBy: { firstName: "asc" },
+      select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true },
+    }),
   ]);
 
   if (!transfer) return <p className="p-6 text-sm text-gray-500">Traslado no encontrado.</p>;
@@ -117,8 +121,9 @@ export default async function AdminTransferDetail({
               <AssignForm
                 transferId={transfer.id}
                 celadores={celadores.map((c) => ({
-                  id:   c.id,
-                  name: [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
+                  id:      c.id,
+                  name:    [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
+                  onBreak: !!(c.breakUntil && c.breakUntil > new Date()),
                 }))}
                 currentCeladorId={transfer.assignedToId ?? undefined}
               />

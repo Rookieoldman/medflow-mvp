@@ -12,6 +12,21 @@ export async function GET() {
 
   const celadorId = session.user.id;
 
+  /* Estado de descanso del celador */
+  const now     = new Date();
+  const celador = await prisma.user.findUnique({
+    where:  { id: celadorId },
+    select: { breakUntil: true, breakUsedAt: true },
+  });
+  const onBreak      = !!(celador?.breakUntil && celador.breakUntil > now);
+  const breakUntil   = onBreak ? celador!.breakUntil!.toISOString() : null;
+  const breakAvailable = !(
+    celador?.breakUsedAt &&
+    celador.breakUsedAt.getFullYear() === now.getFullYear() &&
+    celador.breakUsedAt.getMonth()    === now.getMonth()    &&
+    celador.breakUsedAt.getDate()     === now.getDate()
+  );
+
   /* ===========================
      TRASLADOS DISPONIBLES
      - NO asignados
@@ -70,5 +85,5 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ available, mine });
+  return NextResponse.json({ available, mine, onBreak, breakUntil, breakAvailable });
 }
