@@ -24,6 +24,7 @@ export default async function AdminDashboardPage() {
       createdAt: true,
       updatedAt: true,
       priority: true,
+      difficulty: true,
     },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
   });
@@ -32,7 +33,7 @@ export default async function AdminDashboardPage() {
     const minutesOpen = Math.floor((Date.now() - t.createdAt.getTime()) / 60000);
     return {
       ...t,
-      atRisk: isAtRisk(t.status, minutesOpen, t.priority),
+      atRisk:    isAtRisk(t.status, minutesOpen, t.priority, t.difficulty),
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
     };

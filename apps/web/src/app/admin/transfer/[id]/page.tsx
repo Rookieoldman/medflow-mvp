@@ -1,18 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
+import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
+import { StatusBadge } from "@/components/StatusBadge";
+import { PriorityBadge } from "@/components/PriorityBadge";
+import { DifficultyBadge } from "@/components/DifficultyBadge";
+import { TransferTimeline } from "@/components/TransferTimeline";
+import { fDate, fDateTime } from "@/lib/format";
+import AssignForm from "./AssignForm";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  SOLICITADO: { label: "Solicitado", color: "bg-amber-100 text-amber-800" },
-  ASIGNADO:   { label: "Asignado",   color: "bg-blue-100 text-blue-800"   },
-  EN_CURSO:   { label: "En curso",   color: "bg-indigo-100 text-indigo-800" },
-  EN_PRUEBA:  { label: "En prueba",  color: "bg-purple-100 text-purple-800" },
-  PAUSADO:    { label: "Pausado",    color: "bg-gray-100 text-gray-700"   },
-  FINALIZADO: { label: "Finalizado", color: "bg-green-100 text-green-800"  },
-  CANCELADO:  { label: "Cancelado",  color: "bg-red-100 text-red-700"     },
-};
 
 const INCIDENT_LABELS: Record<string, string> = {
   PACIENTE_NO_PREPARADO: "Paciente no preparado",
@@ -21,149 +17,182 @@ const INCIDENT_LABELS: Record<string, string> = {
   OTRO:                  "Otro",
 };
 
+const TEST_LABELS: Record<string, string> = {
+  RM: "RM", ECO: "Eco", RX: "RX", MEDICINA_NUCLEAR: "Med. Nuclear", TC: "TC",
+};
+
 export default async function AdminTransferDetail({
   params,
 }: {
   params: Promise<{ id: string }> | { id: string };
 }) {
-  const resolvedParams = await Promise.resolve(params as any);
-  const id = resolvedParams?.id;
+  const { id } = await Promise.resolve(params as any);
+  if (!id) return <p className="p-6 text-sm text-gray-500">Falta el id.</p>;
 
-  if (!id) return <p className="text-sm text-gray-500">Falta el id en la URL.</p>;
-
-  const transfer = await prisma.transfer.findUnique({
-    where: { id },
-    include: {
-      createdBy: true,
-      assignedTo: true,
-      acceptance: true,
-      incidents: {
-        include: { createdBy: true },
-        orderBy: { createdAt: "desc" },
+  const [transfer, celadores] = await Promise.all([
+    prisma.transfer.findUnique({
+      where: { id },
+      include: {
+        createdBy:  true,
+        assignedTo: true,
+        acceptance: true,
+        incidents: { include: { createdBy: true }, orderBy: { createdAt: "desc" } },
+        events:    {
+          include: { actor: { select: { firstName: true, lastName1: true, email: true, role: true } } },
+          orderBy: { createdAt: "asc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.user.findMany({ where: { role: "CELADOR", active: true }, orderBy: { firstName: "asc" } }),
+  ]);
 
-  if (!transfer) return <p className="text-sm text-gray-500">Traslado no encontrado.</p>;
+  if (!transfer) return <p className="p-6 text-sm text-gray-500">Traslado no encontrado.</p>;
 
-  const statusCfg = STATUS_LABELS[transfer.status] ?? { label: transfer.status, color: "bg-gray-100 text-gray-700" };
+  const isFinal = ["FINALIZADO", "CANCELADO"].includes(transfer.status);
+  const durationMin = isFinal
+    ? Math.round((transfer.updatedAt.getTime() - transfer.createdAt.getTime()) / 60000)
+    : null;
+
+  const creatorName = [transfer.createdBy.firstName, transfer.createdBy.lastName1].filter(Boolean).join(" ") || transfer.createdBy.email;
+  const celadorName = transfer.assignedTo
+    ? [transfer.assignedTo.firstName, transfer.assignedTo.lastName1].filter(Boolean).join(" ") || transfer.assignedTo.email
+    : null;
 
   return (
-    <div className="space-y-5 max-w-3xl">
-      <Link
-        href="/admin/transfers"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-      >
-        ← Volver a traslados
-      </Link>
+    <div className="max-w-3xl mx-auto px-0 space-y-5">
+      <PageHeader
+        title={transfer.patientFullName}
+        subtitle={`Nº Historia: ${transfer.mrn}`}
+        back={{ href: "/admin/transfers", label: "Volver a traslados" }}
+      />
 
-      {/* ── CABECERA ── */}
-      <div className="border rounded-xl p-5 bg-white shadow-sm space-y-1">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">{transfer.patientFullName}</h1>
-            <p className="text-sm text-gray-500 font-mono">{transfer.mrn}</p>
+      {/* ── ESTADO + BADGES ── */}
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge     status={transfer.status} />
+            <PriorityBadge   priority={transfer.priority} />
+            <DifficultyBadge difficulty={transfer.difficulty} />
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium shrink-0 ${statusCfg.color}`}>
-            {statusCfg.label}
-          </span>
+          {durationMin !== null && (
+            <span className="text-sm text-gray-500">
+              Duración total: <strong className="text-gray-900">{durationMin} min</strong>
+            </span>
+          )}
         </div>
-      </div>
+      </Card>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* ── DATOS CLÍNICOS ── */}
-        <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Datos clínicos</h2>
+        <Card>
+          <CardHeader title="Datos clínicos" />
           <dl className="space-y-2 text-sm">
-            <Row label="Fecha de nacimiento" value={transfer.dob.toLocaleDateString("es-ES")} />
-            <Row label="Ubicación" value={transfer.location} />
-            <Row label="Tipo de prueba" value={transfer.testType} />
-            <Row
-              label="Prioridad"
-              value={
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  transfer.priority === "URGENTE"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-gray-100 text-gray-600"
-                }`}>
-                  {transfer.priority}
-                </span>
-              }
-            />
-            <Row label="Creado" value={transfer.createdAt.toLocaleString("es-ES")} />
+            <Row label="Fecha de nacimiento" value={fDate(transfer.dob)} />
+            <Row label="Ubicación"           value={transfer.location} />
+            <Row label="Tipo de prueba"      value={TEST_LABELS[transfer.testType] ?? transfer.testType} />
+            <Row label="Ámbito"              value={transfer.scope === "URGENCIAS" ? "Urgencias" : "Planta"} />
+            <Row label="Requiere firma"      value={transfer.requiresAcceptance ? "Sí" : "No"} />
+            <Row label="Solicitado"          value={fDateTime(transfer.createdAt)} />
+            {isFinal && <Row label="Finalizado" value={fDateTime(transfer.updatedAt)} />}
           </dl>
-        </div>
+        </Card>
 
         {/* ── RESPONSABLES ── */}
-        <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Responsables</h2>
+        <Card>
+          <CardHeader title="Responsables" />
           <dl className="space-y-2 text-sm">
-            <Row label="Técnico" value={transfer.createdBy.email} />
+            <Row label="Técnico"  value={creatorName} />
             <Row
               label="Celador"
-              value={transfer.assignedTo?.email ?? <span className="text-gray-400 italic">Sin asignar</span>}
+              value={celadorName ?? <span className="text-gray-400 italic">Sin asignar</span>}
             />
           </dl>
-        </div>
+
+          {/* Asignación manual */}
+          {!isFinal && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                {transfer.assignedToId ? "Reasignar celador" : "Asignar celador"}
+              </p>
+              <AssignForm
+                transferId={transfer.id}
+                celadores={celadores.map((c) => ({
+                  id:   c.id,
+                  name: [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
+                }))}
+                currentCeladorId={transfer.assignedToId ?? undefined}
+              />
+            </div>
+          )}
+        </Card>
       </div>
 
-      {/* ── ACEPTACIÓN / FIRMA ── */}
-      <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aceptación del traslado</h2>
-        {!transfer.acceptance ? (
-          <p className="text-sm text-gray-400 italic">Pendiente de aceptación.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <dl className="space-y-2">
-              <Row label="Firmante" value={transfer.acceptance.signerName} />
-              {transfer.acceptance.signerRole && (
-                <Row label="Rol firmante" value={transfer.acceptance.signerRole} />
-              )}
-              <Row label="Fecha de firma" value={transfer.acceptance.signedAt.toLocaleString("es-ES")} />
-            </dl>
-            <div>
-              <p className="text-xs text-gray-500 mb-2">Firma</p>
-              <div className="border rounded-lg p-2 bg-gray-50 inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={transfer.acceptance.signatureData}
-                  alt="Firma del responsable"
-                  className="max-h-24"
-                />
+      {/* ── FIRMA ── */}
+      {transfer.requiresAcceptance && (
+        <Card>
+          <CardHeader title="Aceptación del traslado" />
+          {!transfer.acceptance ? (
+            <p className="text-sm text-gray-400 italic">Pendiente de firma de responsable de planta.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <dl className="space-y-2">
+                <Row label="Firmante"    value={transfer.acceptance.signerName} />
+                {transfer.acceptance.signerRole && (
+                  <Row label="Rol"       value={transfer.acceptance.signerRole} />
+                )}
+                <Row label="Fecha firma" value={fDateTime(transfer.acceptance.signedAt)} />
+              </dl>
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Firma digitalizada</p>
+                <div className="border rounded-lg p-2 bg-gray-50 inline-block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={transfer.acceptance.signatureData}
+                    alt="Firma del responsable"
+                    className="max-h-24"
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── HISTORIAL ── */}
+      <Card>
+        <CardHeader
+          title="Historial de estados"
+          subtitle={`${transfer.events.length} eventos registrados`}
+        />
+        <TransferTimeline events={transfer.events} />
+      </Card>
 
       {/* ── INCIDENCIAS ── */}
-      <div className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Incidencias · {transfer.incidents.length}
-        </h2>
+      <Card>
+        <CardHeader title={`Incidencias · ${transfer.incidents.length}`} />
         {transfer.incidents.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">Sin incidencias registradas.</p>
+          <EmptyState title="Sin incidencias" subtitle="No se han registrado incidencias para este traslado" icon="✅" />
         ) : (
           <ul className="space-y-2">
             {transfer.incidents.map((i) => (
-              <li key={i.id} className="border rounded-lg p-3 text-sm space-y-1">
-                <div className="flex items-center justify-between">
+              <li key={i.id} className="border border-gray-100 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-gray-800">
                     {INCIDENT_LABELS[i.type] ?? i.type}
                   </span>
-                  <span className="text-xs text-gray-400">
-                    {i.createdAt.toLocaleString("es-ES")}
-                  </span>
+                  <span className="text-xs text-gray-400">{fDateTime(i.createdAt)}</span>
                 </div>
-                {i.note && <p className="text-gray-600 text-sm">{i.note}</p>}
+                {i.note && <p className="text-gray-600">{i.note}</p>}
                 {i.createdBy && (
-                  <p className="text-xs text-gray-400">{i.createdBy.email}</p>
+                  <p className="text-xs text-gray-400">
+                    {[i.createdBy.firstName, i.createdBy.lastName1].filter(Boolean).join(" ") || i.createdBy.email}
+                  </p>
                 )}
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -172,7 +201,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-2">
       <dt className="text-gray-400 shrink-0">{label}</dt>
-      <dd className="text-gray-800 text-right">{value}</dd>
+      <dd className="text-gray-700 text-right">{value}</dd>
     </div>
   );
 }

@@ -3,5 +3,8 @@
     "@auth/prisma-adapter": "^2.11.1",
     "bcrypt": "^6.0.0",
     "next-auth": "^4.24.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2"
   }
 }

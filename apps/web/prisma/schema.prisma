@@ -23,6 +23,7 @@ model User {
   transfersCreated  Transfer[] @relation("TransfersCreated")
   transfersAssigned Transfer[] @relation("TransfersAssigned")
   incidentsCreated  Incident[] @relation("IncidentsCreated")
+  transferEvents    TransferEvent[]
 
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -58,6 +59,22 @@ model Transfer {
   assignedTo          User?    @relation("TransfersAssigned", fields: [assignedToId], references: [id])
   acceptance          TransferAcceptance?
   incidents           Incident[]
+  events              TransferEvent[]
+}
+
+model TransferEvent {
+  id         String   @id @default(cuid())
+  transferId String
+  transfer   Transfer @relation(fields: [transferId], references: [id])
+
+  fromStatus TransferStatus?
+  toStatus   TransferStatus
+
+  actorId    String
+  actor      User    @relation(fields: [actorId], references: [id])
+
+  note       String?
+  createdAt  DateTime @default(now())
 }
 
 model TransferAcceptance {

@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { recordEvent } from "@/lib/transferEvents";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
@@ -18,12 +19,12 @@ CANCELADO
 PAUSADO
 */
 
+// EN_PRUEBA y FINALIZADO son responsabilidad del TÉCNICO, no del celador
 const ALLOWED: Record<string, string[]> = {
   SOLICITADO: ["ASIGNADO", "EN_CURSO"],
-  ASIGNADO: ["EN_CURSO"],
-  EN_CURSO: ["EN_PRUEBA", "PAUSADO", "CANCELADO"],
-  EN_PRUEBA: ["FINALIZADO", "PAUSADO", "CANCELADO"],
-  PAUSADO: ["EN_CURSO", "EN_PRUEBA"],
+  ASIGNADO:   ["EN_CURSO"],
+  EN_CURSO:   ["PAUSADO"],
+  PAUSADO:    ["EN_CURSO"],
 };
 
 /* ============================================================
@@ -64,11 +65,10 @@ export async function assignToMe(formData: FormData) {
 
   await prisma.transfer.update({
     where: { id: transferId },
-    data: {
-      assignedToId: celadorId,
-      status: nextStatus,
-    },
+    data: { assignedToId: celadorId, status: nextStatus },
   });
+
+  await recordEvent(transferId, celadorId, nextStatus, transfer.status);
 
   revalidatePath("/celador");
 }
@@ -105,10 +105,10 @@ export async function setStatus(formData: FormData) {
 
   await prisma.transfer.update({
     where: { id: transferId },
-    data: {
-      status: next as any,
-    },
+    data: { status: next as any },
   });
+
+  await recordEvent(transferId, celadorId, next as any, transfer.status);
 
   revalidatePath("/celador");
 }
@@ -136,11 +136,10 @@ export async function pauseTransfer(formData: FormData) {
 
   await prisma.transfer.update({
     where: { id: transferId },
-    data: {
-      previousStatus: transfer.status,
-      status: "PAUSADO",
-    },
+    data: { previousStatus: transfer.status, status: "PAUSADO" },
   });
+
+  await recordEvent(transferId, celadorId, "PAUSADO", transfer.status);
 
   revalidatePath("/celador");
 }
@@ -163,13 +162,14 @@ export async function resumeTransfer(formData: FormData) {
 
   if (transfer.status !== "PAUSADO") return;
 
+  const resumeStatus = transfer.previousStatus ?? "EN_CURSO";
+
   await prisma.transfer.update({
     where: { id: transferId },
-    data: {
-      status: transfer.previousStatus ?? "EN_CURSO",
-      previousStatus: null,
-    },
+    data: { status: resumeStatus, previousStatus: null },
   });
+
+  await recordEvent(transferId, celadorId, resumeStatus, "PAUSADO");
 
   revalidatePath("/celador");
 }
@@ -210,21 +210,15 @@ export async function acceptTransfer(formData: FormData) {
 
   await prisma.$transaction([
     prisma.transferAcceptance.create({
-      data: {
-        transferId,
-        signerName,
-        signerRole: signerRole || null,
-        signatureData,
-        celadorId,
-      },
+      data: { transferId, signerName, signerRole: signerRole || null, signatureData, celadorId },
     }),
     prisma.transfer.update({
       where: { id: transferId },
-      data: {
-        status: "EN_CURSO",
-      },
+      data: { status: "EN_CURSO" },
     }),
   ]);
+
+  await recordEvent(transferId, celadorId, "EN_CURSO", "ASIGNADO", `Firmado por: ${signerName}`);
 
   revalidatePath("/celador");
 }

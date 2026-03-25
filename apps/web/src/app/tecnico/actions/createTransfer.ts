@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { recordEvent } from "@/lib/transferEvents";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
@@ -49,7 +50,7 @@ export async function createTransfer(formData: FormData) {
 
   const requiresAcceptance = scope === "PLANTA";
 
-  await prisma.transfer.create({
+  const transfer = await prisma.transfer.create({
     data: {
       mrn,
       patientFullName,
@@ -64,6 +65,8 @@ export async function createTransfer(formData: FormData) {
       createdById: session.user.id,
     },
   });
+
+  await recordEvent(transfer.id, session.user.id, "SOLICITADO", undefined, "Traslado creado");
 
   redirect("/tecnico");
 }

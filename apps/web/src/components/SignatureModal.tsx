@@ -1,137 +1,165 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 type Props = {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (data: {
-    signerName: string;
-    signerRole?: string;
-    signatureData: string;
-  }) => void;
+  open:      boolean;
+  onClose:   () => void;
+  onConfirm: (data: { signerName: string; signerRole?: string; signatureData: string }) => void;
 };
 
-export default function SignatureModal({
-  open,
-  onClose,
-  onConfirm,
-}: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const drawing = useRef(false);
+const INPUT = "border border-gray-200 rounded-lg px-3 py-2 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300";
+
+export default function SignatureModal({ open, onClose, onConfirm }: Props) {
+  const canvasRef    = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const drawing      = useRef(false);
+  const lastPos      = useRef<{ x: number; y: number } | null>(null);
 
   const [signerName, setSignerName] = useState("");
   const [signerRole, setSignerRole] = useState("");
 
+  /* Ajustar canvas al ancho del contenedor */
+  useEffect(() => {
+    if (!open) return;
+    const el = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!el || !canvas) return;
+    canvas.width  = el.clientWidth;
+    canvas.height = 140;
+  }, [open]);
+
   if (!open) return null;
 
+  /* ── Mouse ── */
+  function getPos(e: React.MouseEvent<HTMLCanvasElement>) {
+    const r = canvasRef.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
   function startDraw(e: React.MouseEvent<HTMLCanvasElement>) {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-
     drawing.current = true;
-    ctx.beginPath();
-    ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    lastPos.current = getPos(e);
   }
-
   function draw(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (!drawing.current) return;
+    if (!drawing.current || !lastPos.current) return;
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
-
-    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
     ctx.stroke();
+    lastPos.current = pos;
   }
+  function endDraw() { drawing.current = false; lastPos.current = null; }
 
-  function endDraw() {
-    drawing.current = false;
+  /* ── Touch ── */
+  function getTouchPos(e: React.TouchEvent<HTMLCanvasElement>) {
+    const r = canvasRef.current!.getBoundingClientRect();
+    const t = e.touches[0];
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function touchStart(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    drawing.current = true;
+    lastPos.current = getTouchPos(e);
+  }
+  function touchMove(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    if (!drawing.current || !lastPos.current) return;
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const pos = getTouchPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    lastPos.current = pos;
   }
 
   function clearCanvas() {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!canvas) return;
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
   }
 
   function handleConfirm() {
-    if (!signerName.trim()) {
-      alert("El nombre del responsable es obligatorio");
-      return;
-    }
-
-    const signatureData =
-      canvasRef.current?.toDataURL("image/png") ?? "";
-
+    if (!signerName.trim()) { alert("El nombre del responsable es obligatorio"); return; }
     onConfirm({
       signerName,
       signerRole: signerRole || undefined,
-      signatureData,
+      signatureData: canvasRef.current?.toDataURL("image/png") ?? "",
     });
-
     onClose();
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded shadow-lg w-full max-w-lg p-6 space-y-4">
-        <h2 className="text-lg font-semibold">
-          Aceptar traslado (firma)
-        </h2>
+    <div
+      className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-xl shadow-xl space-y-4 p-5 rounded-t-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">Firma del responsable</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+        </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <input
-            className="border p-2 w-full"
-            placeholder="Nombre del responsable"
+            className={INPUT}
+            placeholder="Nombre del responsable *"
             value={signerName}
             onChange={(e) => setSignerName(e.target.value)}
           />
-
           <input
-            className="border p-2 w-full"
+            className={INPUT}
             placeholder="Rol / Unidad (opcional)"
             value={signerRole}
             onChange={(e) => setSignerRole(e.target.value)}
           />
         </div>
 
-        <div>
-          <p className="text-sm text-gray-600 mb-1">Firma:</p>
+        <div ref={containerRef}>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Firma</p>
+            <button onClick={clearCanvas} className="text-xs text-gray-400 hover:text-gray-700">
+              Limpiar
+            </button>
+          </div>
           <canvas
             ref={canvasRef}
-            width={400}
-            height={150}
-            className="border w-full cursor-crosshair"
+            className="border border-gray-200 rounded-lg w-full cursor-crosshair bg-gray-50 touch-none"
+            style={{ height: 140 }}
             onMouseDown={startDraw}
             onMouseMove={draw}
             onMouseUp={endDraw}
             onMouseLeave={endDraw}
+            onTouchStart={touchStart}
+            onTouchMove={touchMove}
+            onTouchEnd={endDraw}
           />
+          <p className="text-xs text-gray-400 mt-1 text-center">Dibuja tu firma en el recuadro</p>
         </div>
 
-        <div className="flex justify-between gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <button
-            className="border px-3 py-2 text-sm"
-            onClick={clearCanvas}
+            onClick={handleConfirm}
+            className="flex-1 bg-gray-900 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-gray-700 transition-colors"
           >
-            Limpiar firma
+            Confirmar aceptación
           </button>
-
-          <div className="flex gap-2">
-            <button
-              className="border px-3 py-2 text-sm"
-              onClick={onClose}
-            >
-              Cancelar
-            </button>
-
-            <button
-              className="bg-blue-600 text-white px-4 py-2 text-sm"
-              onClick={handleConfirm}
-            >
-              Confirmar aceptación
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
         </div>
       </div>
     </div>

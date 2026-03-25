@@ -11,250 +11,244 @@ import {
   acceptTransfer,
 } from "./serverActions";
 
-import SignatureModal from "@/components/SignatureModal";
-import { StatusBadge } from "@/components/StatusBadge";
-import { PriorityBadge } from "@/components/PriorityBadge";
+import SignatureModal  from "@/components/SignatureModal";
+import { PriorityBadge }   from "@/components/PriorityBadge";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
-import { initials } from "@/lib/patient";
-import ElapsedTime from "@/components/ElapsedTime";
+import { StatusBadge }     from "@/components/StatusBadge";
+import { EmptyState }      from "@/components/ui";
 import LoadingInline from "@/components/LoadingInline";
+import ElapsedTime   from "@/components/ElapsedTime";
 
 type Transfer = {
-  id: string;
-  mrn: string;
-  patientFullName: string;
-  location: string;
-  testType: string;
-  priority: string;
-  status: string;
-  difficulty: string;
-  createdAt: string;
+  id:                string;
+  mrn:               string;
+  patientFullName:   string;
+  location:          string;
+  testType:          string;
+  priority:          string;
+  status:            string;
+  difficulty:        string;
+  createdAt:         string;
   requiresAcceptance?: boolean;
 };
 
+const TEST_LABELS: Record<string, string> = {
+  RM: "RM", ECO: "Eco", RX: "RX", MEDICINA_NUCLEAR: "Med. Nuclear", TC: "TC",
+};
+
+const DIFFICULTY_BORDER: Record<string, string> = {
+  CRITICO:  "border-l-red-500",
+  MODERADO: "border-l-yellow-400",
+  BANAL:    "border-l-green-400",
+};
+
+const STATUS_CTX: Record<string, string> = {
+  ASIGNADO:  "Pendiente de firma del responsable",
+  EN_CURSO:  "Traslado en curso",
+  PAUSADO:   "Traslado pausado",
+  EN_PRUEBA: "Paciente en la sala — esperando al técnico",
+};
+
+const BTN = "border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
 export default function CeladorClient() {
   const [available, setAvailable] = useState<Transfer[]>([]);
-  const [mine, setMine] = useState<Transfer[]>([]);
+  const [mine,      setMine]      = useState<Transfer[]>([]);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [openSignature, setOpenSignature] = useState<string | null>(null);
+  const [openSig,   setOpenSig]   = useState<string | null>(null);
 
-  /* ===========================
-     POLLING
-  ============================ */
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-
-    const fetchTransfers = async () => {
+    const fetch_ = async () => {
       const res = await fetch("/api/celador/transfers");
       if (!res.ok) return;
-
       const data = await res.json();
       setAvailable(data.available ?? []);
       setMine(data.mine ?? []);
-
-      // 🔓 desbloqueo si ya no existe
       if (pendingId) {
         const exists =
           data.available?.some((t: Transfer) => t.id === pendingId) ||
           data.mine?.some((t: Transfer) => t.id === pendingId);
-
         if (!exists) setPendingId(null);
       }
     };
-
-    fetchTransfers();
-    timer = setInterval(fetchTransfers, 5000);
-
-    return () => clearInterval(timer);
+    fetch_();
+    const t = setInterval(fetch_, 5000);
+    return () => clearInterval(t);
   }, [pendingId]);
 
-  /* ===========================
-     HELPER EJECUCIÓN SEGURA
-  ============================ */
   const run = async (
-    transferId: string,
+    id: string,
     action: (fd: FormData) => Promise<void>,
     extra?: (fd: FormData) => void
   ) => {
     if (pendingId) return;
-
-    setPendingId(transferId);
-
+    setPendingId(id);
     const fd = new FormData();
-    fd.set("transferId", transferId);
+    fd.set("transferId", id);
     extra?.(fd);
-
-    try {
-      await action(fd);
-    } catch (e) {
-      console.error(e);
-      setPendingId(null);
-    }
-
-    // fallback defensivo
+    try { await action(fd); } catch (e) { console.error(e); setPendingId(null); }
     setTimeout(() => setPendingId(null), 2000);
   };
 
-  /* ===========================
-     RENDER
-  ============================ */
   return (
     <>
-      {/* ===========================
-          DISPONIBLES
-      ============================ */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Traslados disponibles</h2>
+      {/* ════════════════════════════════════════
+          DISPONIBLES — tarjetas tipo "solicitud"
+      ════════════════════════════════════════ */}
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-gray-900">
+          Disponibles
+          {available.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-gray-400">· {available.length}</span>
+          )}
+        </h2>
 
         {available.length === 0 ? (
-          <p className="text-sm text-gray-600">No hay traslados disponibles.</p>
+          <EmptyState title="Sin solicitudes disponibles" subtitle="Se actualizará automáticamente" icon="⏳" />
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {available.map((t) => (
               <div
                 key={t.id}
-                className="relative border rounded p-4 flex justify-between"
+                className={`border-l-4 ${DIFFICULTY_BORDER[t.difficulty] ?? "border-l-gray-300"} border border-gray-200 rounded-xl bg-white shadow-sm flex flex-col`}
               >
-                <div className="absolute top-2 right-2">
-                  <ElapsedTime createdAt={t.createdAt} />
-                </div>
+                {/* Cuerpo de la tarjeta */}
+                <div className="p-4 flex-1 space-y-3">
+                  {/* Fila superior */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-gray-400">{t.mrn}</span>
+                    <ElapsedTime createdAt={t.createdAt} />
+                  </div>
 
-                <div className="space-y-1">
-                  <div className="font-mono text-sm">{t.mrn}</div>
-                  <div className="text-2xl font-semibold">
-                    {initials(t.patientFullName)}
+                  {/* Ubicación — lo más importante para el celador */}
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Origen</p>
+                    <p className="font-semibold text-gray-900 text-sm sm:text-base">{t.location}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Prueba: {TEST_LABELS[t.testType] ?? t.testType}
+                    </p>
                   </div>
-                  <div className="text-sm text-gray-600">
-                    {t.location} → {t.testType}
+
+                  {/* Paciente (anonimizado) */}
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
+                      {t.patientFullName.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
+                    </div>
+                    <p className="text-sm text-gray-700 font-medium truncate">{t.patientFullName}</p>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+
+                  {/* Badges */}
+                  <div className="flex flex-wrap gap-1.5">
                     <DifficultyBadge difficulty={t.difficulty} />
-                    <PriorityBadge priority={t.priority} />
-                    <StatusBadge status={t.status} />
+                    <PriorityBadge   priority={t.priority} />
                   </div>
                 </div>
 
-                <button
-                  disabled={pendingId === t.id}
-                  onClick={() => run(t.id, assignToMe)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                >
-                  Asignarme
-                </button>
+                {/* CTA */}
+                <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+                  <button
+                    disabled={!!pendingId}
+                    onClick={() => run(t.id, assignToMe)}
+                    className="w-full bg-gray-900 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                  >
+                    {pendingId === t.id ? "Asignando…" : "Asignarme este traslado"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* ===========================
-          MIS TRASLADOS
-      ============================ */}
-      <section className="space-y-4 mt-10">
-        <h2 className="text-lg font-semibold">Mis traslados</h2>
+      {/* ════════════════════════════════════════
+          MIS TRASLADOS — acciones de transporte
+      ════════════════════════════════════════ */}
+      <section className="space-y-3 mt-8">
+        <h2 className="text-base font-semibold text-gray-900">
+          Mis traslados
+          {mine.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-gray-400">· {mine.length}</span>
+          )}
+        </h2>
 
         {mine.length === 0 ? (
-          <p className="text-sm text-gray-600">No tienes traslados activos.</p>
+          <EmptyState title="No tienes traslados activos" icon="✅" />
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {mine.map((t) => {
               const disabled = pendingId === t.id;
+              const isReadOnly = t.status === "EN_PRUEBA"; // técnico tiene el control
 
               return (
                 <div
                   key={t.id}
-                  className="relative border rounded p-4 space-y-4"
+                  className={`border-l-4 ${DIFFICULTY_BORDER[t.difficulty] ?? "border-l-gray-300"} border border-gray-200 rounded-xl bg-white shadow-sm`}
                 >
-                  <div className="absolute top-2 right-2">
-                    <ElapsedTime createdAt={t.createdAt} />
-                  </div>
-
-                  <div className="flex justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="font-mono text-sm">{t.mrn}</div>
-                      <div className="text-2xl font-semibold">
-                        {initials(t.patientFullName)}
+                  {/* Info */}
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-gray-400">{t.mrn}</span>
+                          <ElapsedTime createdAt={t.createdAt} />
+                        </div>
+                        <p className="font-semibold text-gray-900 text-sm truncate">{t.patientFullName}</p>
+                        <p className="text-xs text-gray-500">{t.location} · {TEST_LABELS[t.testType] ?? t.testType}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          <StatusBadge     status={t.status} />
+                          <DifficultyBadge difficulty={t.difficulty} />
+                          <PriorityBadge   priority={t.priority} />
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {t.location} → {t.testType}
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        <DifficultyBadge difficulty={t.difficulty} />
-                        <PriorityBadge priority={t.priority} />
-                        <StatusBadge status={t.status} />
-                      </div>
+                      <Link
+                        href={`/celador/transfer/${t.id}`}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0 self-start pt-0.5"
+                      >
+                        Detalle →
+                      </Link>
                     </div>
 
-                    <Link
-                      href={`/celador/transfer/${t.id}`}
-                      className="underline text-sm self-end"
-                    >
-                      Ver
-                    </Link>
+                    {/* Contexto de estado */}
+                    {STATUS_CTX[t.status] && (
+                      <p className="text-xs text-gray-500 italic border-t border-gray-50 pt-2">
+                        {STATUS_CTX[t.status]}
+                      </p>
+                    )}
                   </div>
 
-                  {/* ===========================
-                      ACCIONES
-                  ============================ */}
-                  <div className="flex flex-wrap gap-2">
-                    {t.status === "ASIGNADO" && t.requiresAcceptance && (
-                      <button
-                        disabled={disabled}
-                        onClick={() => setOpenSignature(t.id)}
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        Firmar responsable
-                      </button>
-                    )}
+                  {/* Acciones de transporte — solo si no está en manos del técnico */}
+                  {!isReadOnly && (
+                    <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl flex flex-wrap gap-2">
+                      {/* Firma */}
+                      {t.status === "ASIGNADO" && t.requiresAcceptance && (
+                        <button disabled={disabled} onClick={() => setOpenSig(t.id)} className={BTN}>
+                          ✍ Firmar responsable
+                        </button>
+                      )}
 
-                    {t.status === "EN_CURSO" && (
-                      <button
-                        disabled={disabled}
-                        onClick={() =>
-                          run(t.id, setStatus, (fd) =>
-                            fd.set("next", "EN_PRUEBA")
-                          )
-                        }
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        En la prueba
-                      </button>
-                    )}
+                      {/* Pausar / Reanudar */}
+                      {t.status !== "PAUSADO" ? (
+                        <button disabled={disabled} onClick={() => run(t.id, pauseTransfer)} className={BTN}>
+                          ⏸ Pausar
+                        </button>
+                      ) : (
+                        <button disabled={disabled} onClick={() => run(t.id, resumeTransfer)} className={BTN}>
+                          ▶ Reanudar
+                        </button>
+                      )}
 
-                    {t.status === "EN_PRUEBA" && (
-                      <button
-                        disabled={disabled}
-                        onClick={() =>
-                          run(t.id, setStatus, (fd) =>
-                            fd.set("next", "FINALIZADO")
-                          )
-                        }
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        Finalizar
-                      </button>
-                    )}
+                      {disabled && <LoadingInline label="Actualizando..." />}
+                    </div>
+                  )}
 
-                    {t.status !== "PAUSADO" ? (
-                      <button
-                        disabled={disabled}
-                        onClick={() => run(t.id, pauseTransfer)}
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        Pausar
-                      </button>
-                    ) : (
-                      <button
-                        disabled={disabled}
-                        onClick={() => run(t.id, resumeTransfer)}
-                        className="border px-3 py-2 rounded disabled:opacity-50"
-                      >
-                        Reanudar
-                      </button>
-                    )}
-
-                    {disabled && <LoadingInline label="Actualizando..." />}
-                  </div>
+                  {/* EN_PRUEBA — aviso de que el técnico tiene el control */}
+                  {isReadOnly && (
+                    <div className="px-4 py-3 border-t border-violet-100 bg-violet-50 rounded-b-xl">
+                      <p className="text-xs text-violet-700 font-medium">
+                        🔬 El técnico está realizando la prueba — sin acciones disponibles
+                      </p>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -262,26 +256,20 @@ export default function CeladorClient() {
         )}
       </section>
 
-      {/* ===========================
-          MODAL FIRMA
-      ============================ */}
+      {/* MODAL FIRMA */}
       <SignatureModal
-        open={!!openSignature}
-        onClose={() => setOpenSignature(null)}
+        open={!!openSig}
+        onClose={() => setOpenSig(null)}
         onConfirm={async (data) => {
-          if (!openSignature) return;
-
-          setPendingId(openSignature);
-
+          if (!openSig) return;
+          setPendingId(openSig);
           const fd = new FormData();
-          fd.set("transferId", openSignature);
-          fd.set("signerName", data.signerName);
+          fd.set("transferId", openSig);
+          fd.set("signerName",  data.signerName);
           if (data.signerRole) fd.set("signerRole", data.signerRole);
           fd.set("signatureData", data.signatureData);
-
           await acceptTransfer(fd);
-          setOpenSignature(null);
-
+          setOpenSig(null);
           setTimeout(() => setPendingId(null), 1500);
         }}
       />

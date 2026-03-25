@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { recordEvent } from "@/lib/transferEvents";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
@@ -41,12 +42,11 @@ export async function cancelPrueba(formData: FormData) {
     }),
     prisma.transfer.update({
       where: { id: transferId },
-      data: {
-        status: "CANCELADO",
-        previousStatus: t.status,
-      },
+      data: { status: "CANCELADO", previousStatus: t.status },
     }),
   ]);
+
+  await recordEvent(transferId, tecnicoId, "CANCELADO", t.status, note || "Cancelado por técnico");
 
   revalidatePath("/tecnico");
   revalidatePath("/celador");

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import UserRow from "./UserRow";
 import Link from "next/link";
+import { PageHeader, EmptyState } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,16 +35,18 @@ export default async function AdminUsersPage({
   return (
     <section className="space-y-5">
 
-      {/* ── CABECERA ── */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Usuarios</h2>
-        <Link
-          href="/admin/users/new"
-          className="rounded-lg bg-black text-white px-4 py-2 text-sm hover:bg-gray-800 transition-colors"
-        >
-          + Crear usuario
-        </Link>
-      </div>
+      <PageHeader
+        title="Usuarios"
+        subtitle="Gestiona técnicos, celadores y administradores"
+        action={
+          <Link
+            href="/admin/users/new"
+            className="rounded-lg bg-gray-900 text-white px-4 py-2 text-sm hover:bg-gray-700 transition-colors"
+          >
+            + Crear usuario
+          </Link>
+        }
+      />
 
       {/* ── RESUMEN POR ROL ── */}
       <div className="flex gap-3 flex-wrap">
@@ -77,30 +80,29 @@ export default async function AdminUsersPage({
         })}
       </div>
 
-      {/* ── TABLA ── */}
       {users.length === 0 ? (
-        <div className="border rounded-xl p-10 text-center text-gray-400 text-sm">
-          No hay usuarios con este filtro.
-        </div>
+        <EmptyState title="No hay usuarios" subtitle="No hay usuarios con este filtro" icon="👤" />
       ) : (
-        <div className="border rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr className="text-left text-gray-500 font-medium">
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Rol</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Alta</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {users.map((u) => (
-                <UserRow key={u.id} user={u} />
-              ))}
-            </tbody>
-          </table>
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr className="text-left text-gray-500 font-medium">
+                  <th className="px-4 py-3">Nombre</th>
+                  <th className="px-4 py-3 hidden sm:table-cell">Email</th>
+                  <th className="px-4 py-3">Rol</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Alta</th>
+                  <th className="px-4 py-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {users.map((u) => (
+                  <UserRow key={u.id} user={u} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>

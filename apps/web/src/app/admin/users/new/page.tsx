@@ -19,7 +19,7 @@ export default async function NewUserPage({
   const prefillEmail = params?.email ?? "";
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-xl mx-auto space-y-6">
       <Link href="/admin/users" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
         ← Volver a usuarios
       </Link>
@@ -131,7 +131,7 @@ export default async function NewUserPage({
         <div className="pt-2 flex items-center gap-3">
           <button
             type="submit"
-            className="rounded-lg bg-black text-white px-5 py-2 text-sm font-medium hover:bg-gray-800 transition-colors"
+            className="rounded-lg bg-gray-900 text-white px-5 py-2 text-sm font-medium hover:bg-gray-700 transition-colors"
           >
             Crear usuario
           </button>

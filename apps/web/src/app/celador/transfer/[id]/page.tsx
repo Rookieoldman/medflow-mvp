@@ -2,9 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
-import Link from "next/link";
+import { DifficultyBadge } from "@/components/DifficultyBadge";
+import { TransferTimeline } from "@/components/TransferTimeline";
+import { fDate, fDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,99 +28,114 @@ export default async function CeladorTransferDetail({
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== "CELADOR") redirect("/login");
 
-  const resolvedParams = await Promise.resolve(params as any);
-  const id = resolvedParams?.id;
+  const { id } = await Promise.resolve(params as any);
   if (!id) return <main className="p-6">Falta el id en la URL.</main>;
 
   const transfer = await prisma.transfer.findUnique({
     where: { id },
     include: {
       acceptance: true,
-      incidents: { orderBy: { createdAt: "desc" } },
+      incidents:  { orderBy: { createdAt: "desc" } },
+      events:     {
+        include: { actor: { select: { firstName: true, lastName1: true, email: true, role: true } } },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
   if (!transfer) return <main className="p-6">Traslado no encontrado.</main>;
 
-  // Solo el celador asignado puede ver el detalle completo
   if (transfer.assignedToId && transfer.assignedToId !== session.user.id) {
     redirect("/celador");
   }
 
+  const isAssigned = transfer.assignedToId === session.user.id;
+  const isFinal    = ["FINALIZADO", "CANCELADO"].includes(transfer.status);
+
   return (
-    <main className="p-6 space-y-6 max-w-2xl">
-      <Link href="/celador" className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-        ← Volver
-      </Link>
+    <main className="max-w-2xl mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
+      <PageHeader
+        title={transfer.patientFullName}
+        subtitle={`Nº Historia: ${transfer.mrn}`}
+        back={{ href: "/celador", label: "Mis traslados" }}
+      />
 
-      {/* ── DATOS DEL PACIENTE ── */}
-      <section className="border rounded-xl p-5 bg-white shadow-sm space-y-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="space-y-1">
-            <div className="font-mono text-sm text-gray-500">
-              Nº historia: {transfer.mrn}
-            </div>
-            <div className="text-xl font-semibold text-gray-900">
-              {transfer.patientFullName}
-            </div>
-            <div className="text-sm text-gray-600">
-              Fecha nacimiento:{" "}
-              {transfer.dob.toLocaleDateString("es-ES")}
-            </div>
-            <div className="text-sm text-gray-600">
-              {transfer.location} → {transfer.testType}
-            </div>
+      {/* ESTADO + BADGES */}
+      <Card>
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge     status={transfer.status} />
+            <PriorityBadge   priority={transfer.priority} />
+            <DifficultyBadge difficulty={transfer.difficulty} />
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <PriorityBadge priority={transfer.priority} />
-            <StatusBadge status={transfer.status} />
-          </div>
+          {transfer.acceptance && (
+            <span className="text-xs text-green-700 bg-green-50 border border-green-100 rounded-full px-2 py-0.5 font-medium">
+              ✔ Firmado
+            </span>
+          )}
         </div>
+      </Card>
 
-        {transfer.acceptance && (
-          <div className="flex items-center gap-2 text-sm text-green-700 font-medium border-t pt-3">
-            <span>✔</span>
-            <span>Traslado aceptado por responsable de planta</span>
-          </div>
-        )}
-      </section>
+      {/* DATOS */}
+      <Card>
+        <CardHeader title="Datos del traslado" />
+        <dl className="space-y-2 text-sm">
+          <Row label="Paciente"    value={transfer.patientFullName} />
+          <Row label="Nacimiento"  value={fDate(transfer.dob)} />
+          <Row label="Ubicación"   value={transfer.location} />
+          <Row label="Prueba"      value={transfer.testType} />
+          <Row label="Solicitado"  value={fDateTime(transfer.createdAt)} />
+          {isFinal && <Row label="Finalizado" value={fDateTime(transfer.updatedAt)} />}
+        </dl>
+      </Card>
 
-      {/* ── ENLACE INCIDENCIA ── */}
-      {transfer.assignedToId === session.user.id &&
-        transfer.status !== "FINALIZADO" &&
-        transfer.status !== "CANCELADO" && (
-          <Link
-            href={`/celador/incidencia/${transfer.id}`}
-            className="inline-flex items-center gap-2 border rounded-lg px-4 py-2 text-sm text-orange-700 border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors"
-          >
-            + Registrar incidencia
-          </Link>
-        )}
+      {/* ACCIÓN — registrar incidencia */}
+      {isAssigned && !isFinal && (
+        <Link
+          href={`/celador/incidencia/${transfer.id}`}
+          className="inline-flex items-center gap-2 border rounded-lg px-4 py-2.5 text-sm font-medium text-orange-700 border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors"
+        >
+          ⚠ Registrar incidencia
+        </Link>
+      )}
 
-      {/* ── INCIDENCIAS ── */}
-      <section className="space-y-3">
-        <h2 className="font-semibold text-gray-800">
-          Incidencias · {transfer.incidents.length}
-        </h2>
+      {/* HISTORIAL */}
+      <Card>
+        <CardHeader
+          title="Historial"
+          subtitle={`${transfer.events.length} eventos`}
+        />
+        <TransferTimeline events={transfer.events} />
+      </Card>
 
+      {/* INCIDENCIAS */}
+      <Card>
+        <CardHeader title={`Incidencias · ${transfer.incidents.length}`} />
         {transfer.incidents.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">Sin incidencias registradas.</p>
+          <EmptyState title="Sin incidencias" icon="✅" subtitle="No se han registrado incidencias" />
         ) : (
           <ul className="space-y-2">
             {transfer.incidents.map((i) => (
-              <li key={i.id} className="border rounded-lg p-3 text-sm space-y-1">
-                <div className="font-medium text-gray-800">
-                  {INCIDENT_LABELS[i.type] ?? i.type}
+              <li key={i.id} className="border border-gray-100 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-gray-800">{INCIDENT_LABELS[i.type] ?? i.type}</span>
+                  <span className="text-xs text-gray-400">{fDateTime(i.createdAt)}</span>
                 </div>
                 {i.note && <p className="text-gray-600">{i.note}</p>}
-                <p className="text-xs text-gray-400">
-                  {i.createdAt.toLocaleString("es-ES")}
-                </p>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Card>
     </main>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <dt className="text-gray-400 shrink-0">{label}</dt>
+      <dd className="text-gray-700 text-right">{value}</dd>
+    </div>
   );
 }

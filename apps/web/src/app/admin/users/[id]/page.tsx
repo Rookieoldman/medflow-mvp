@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updateUser } from "./actions";
+import { fDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,6 @@ function getInitials(firstName: string | null, lastName: string | null) {
   return parts.map((p) => p![0].toUpperCase()).join("");
 }
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 export default async function EditUserPage({
   params,
@@ -53,18 +47,17 @@ export default async function EditUserPage({
   return (
     <div className="space-y-5 max-w-4xl">
 
-      {/* ── BREADCRUMB ── */}
       <Link
         href="/admin/users"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+        className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors"
       >
         ← Volver a usuarios
       </Link>
 
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 items-start">
 
         {/* ── COLUMNA IZQUIERDA: perfil ── */}
-        <aside className="w-64 shrink-0 space-y-4">
+        <aside className="w-full sm:w-56 shrink-0 space-y-4">
           {/* Tarjeta de identidad */}
           <div className="border rounded-xl p-5 bg-white shadow-sm space-y-4">
             {/* Avatar + nombre */}
@@ -94,7 +87,7 @@ export default async function EditUserPage({
               </div>
               <div>
                 <dt className="text-gray-400">Alta</dt>
-                <dd className="text-gray-700">{formatDate(user.createdAt)}</dd>
+                <dd className="text-gray-700">{fDate(user.createdAt)}</dd>
               </div>
               <div>
                 <dt className="text-gray-400">ID</dt>
@@ -234,7 +227,7 @@ export default async function EditUserPage({
             <div className="px-6 py-4 border-t bg-gray-50 flex items-center gap-3">
               <button
                 type="submit"
-                className="rounded-lg bg-black text-white px-5 py-2 text-sm font-medium hover:bg-gray-800 transition-colors"
+                className="rounded-lg bg-gray-900 text-white px-5 py-2 text-sm font-medium hover:bg-gray-700 transition-colors"
               >
                 Guardar cambios
               </button>

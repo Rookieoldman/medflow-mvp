@@ -434,7 +434,7 @@ function TecnicoTab({ data }: { data: TecnicoData }) {
           <p className="p-5 text-sm text-gray-400 italic">Sin datos aún</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left px-5 py-3 font-medium text-gray-600">Técnico</th>
@@ -536,7 +536,7 @@ function CeladorTab({ data }: { data: CeladorData }) {
           <p className="p-5 text-sm text-gray-400 italic">Sin datos aún</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[560px]">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left px-5 py-3 font-medium text-gray-600">Celador</th>
