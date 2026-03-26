@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { revalidatePath } from "next/cache";
-import { breakUsedInCurrentShift, getShift, SHIFT_LABEL } from "@/lib/shifts";
+import { breakUsedInCurrentShift, getShift, SHIFT_LABEL, ShiftName } from "@/lib/shifts";
 import { emitTransferEvent } from "@/lib/eventBus";
+import { Shift } from "@prisma/client";
 
 const BREAK_MINUTES = 20;
 const MIN_AVAILABLE = 2;
@@ -73,4 +74,25 @@ export async function endBreak() {
 
   emitTransferEvent({ type: "celador:break", celadorId });
   revalidatePath("/celador");
+}
+
+/**
+ * Permite al propio celador cambiar su turno activo.
+ * Al cambiar de turno se resetea el contador de descanso.
+ */
+export async function setOwnShift(shift: ShiftName | "OFF") {
+  const celadorId = await getCeladorId();
+
+  await prisma.user.update({
+    where: { id: celadorId },
+    data:  {
+      activeShift: shift === "OFF" ? null : (shift as Shift),
+      breakUsedAt: shift === "OFF" ? undefined : null,
+      breakUntil:  shift === "OFF" ? null : undefined,
+    },
+  });
+
+  emitTransferEvent({ type: "celador:break", celadorId });
+  revalidatePath("/celador");
+  revalidatePath("/admin");
 }

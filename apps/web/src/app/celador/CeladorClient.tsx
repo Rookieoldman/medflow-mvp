@@ -10,7 +10,7 @@ import {
   resumeTransfer,
   acceptTransfer,
 } from "./serverActions";
-import { startBreak, endBreak } from "./breakActions";
+import { startBreak, endBreak, setOwnShift } from "./breakActions";
 
 import SignatureModal  from "@/components/SignatureModal";
 import { PriorityBadge }   from "@/components/PriorityBadge";
@@ -238,7 +238,9 @@ export default function CeladorClient() {
   const [breakUntil,     setBreakUntil]     = useState<string | null>(null);
   const [breakAvailable, setBreakAvailable] = useState(true);
   const [currentShift,   setCurrentShift]   = useState<string | null>(null);
+  const [shiftOpen,      setShiftOpen]      = useState(false);
   const [breakPending,   startBreakTransition] = useTransition();
+  const [shiftPending,   startShiftTransition] = useTransition();
   const breakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -316,18 +318,78 @@ export default function CeladorClient() {
     });
   }
 
+  const SHIFTS = [
+    { value: "MANANA", label: "☀️ Mañana",  sub: "08–15h" },
+    { value: "TARDE",  label: "🌆 Tarde",   sub: "15–22h" },
+    { value: "NOCHE",  label: "🌙 Noche",   sub: "22–08h" },
+  ] as const;
+
+  function handleShiftChange(shift: "MANANA" | "TARDE" | "NOCHE" | "OFF") {
+    startShiftTransition(async () => {
+      await setOwnShift(shift);
+      setCurrentShift(shift === "OFF" ? null : shift);
+      setShiftOpen(false);
+    });
+  }
+
   return (
     <>
       {/* ════════════════════════════════════════
           TURNO ACTIVO
       ════════════════════════════════════════ */}
       <div className="flex items-center justify-between gap-2">
-        {currentShift && (
-          <span className={`text-xs font-medium border rounded-lg px-3 py-1.5 ${SHIFT_COLOR[currentShift] ?? ""}`}>
-            {SHIFT_LABEL[currentShift] ?? currentShift}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {currentShift ? (
+            <span className={`text-xs font-medium border rounded-lg px-3 py-1.5 ${SHIFT_COLOR[currentShift] ?? ""}`}>
+              {SHIFT_LABEL[currentShift] ?? currentShift}
+            </span>
+          ) : (
+            <span className="text-xs text-gray-400 border border-dashed border-gray-300 rounded-lg px-3 py-1.5">
+              Sin turno asignado
+            </span>
+          )}
+          <button
+            onClick={() => setShiftOpen((v) => !v)}
+            disabled={shiftPending}
+            className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2 disabled:opacity-40"
+          >
+            {shiftPending ? "Guardando…" : "Cambiar turno"}
+          </button>
+        </div>
       </div>
+
+      {/* ── Selector de turno ── */}
+      {shiftOpen && (
+        <div className="border border-gray-200 rounded-xl bg-white shadow-sm p-3 space-y-2">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Selecciona tu turno</p>
+          <div className="flex flex-wrap gap-2">
+            {SHIFTS.map(({ value, label, sub }) => (
+              <button
+                key={value}
+                disabled={shiftPending}
+                onClick={() => handleShiftChange(value)}
+                className={`flex-1 min-w-[90px] border rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40 ${
+                  currentShift === value
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <span className="block">{label}</span>
+                <span className="block text-xs opacity-60">{sub}</span>
+              </button>
+            ))}
+            {currentShift && (
+              <button
+                disabled={shiftPending}
+                onClick={() => handleShiftChange("OFF")}
+                className="border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                Quitar turno
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════
           ESTADO DE DESCANSO
