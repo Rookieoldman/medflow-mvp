@@ -172,13 +172,18 @@ export default function DashboardClient({
         <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Celadores · {SHIFT_LABEL[getShiftFromTime(now)]}
+              {SHIFT_LABEL[getShiftFromTime(now)]}
             </h2>
             <span className="text-xs text-gray-400">
               {celadores.filter((c) => !(c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now))).length}
-              &nbsp;/&nbsp;{celadores.length} disponibles
+              &nbsp;/&nbsp;{celadores.length} en turno
             </span>
           </div>
+          {celadores.length === 0 && (
+            <p className="px-5 py-4 text-xs text-gray-400 italic">
+              Ningún celador tiene asignado este turno. Actualízalo desde Usuarios.
+            </p>
+          )}
           <div className="divide-y divide-gray-50">
             {celadores.map((c) => {
               const isOnBreak = c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now);

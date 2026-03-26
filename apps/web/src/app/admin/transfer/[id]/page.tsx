@@ -5,6 +5,7 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { TransferTimeline } from "@/components/TransferTimeline";
 import { fDate, fDateTime } from "@/lib/format";
+import { getShift, SHIFT_LABEL } from "@/lib/shifts";
 import AssignForm from "./AssignForm";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export default async function AdminTransferDetail({
   const { id } = await Promise.resolve(params as any);
   if (!id) return <p className="p-6 text-sm text-gray-500">Falta el id.</p>;
 
+  const now          = new Date();
+  const currentShift = getShift(now);
+
   const [transfer, celadores] = await Promise.all([
     prisma.transfer.findUnique({
       where: { id },
@@ -43,8 +47,9 @@ export default async function AdminTransferDetail({
         },
       },
     }),
+    // Solo celadores del turno actual con su turno asignado
     prisma.user.findMany({
-      where:   { role: "CELADOR", active: true },
+      where:   { role: "CELADOR", active: true, activeShift: currentShift },
       orderBy: { firstName: "asc" },
       select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true },
     }),
@@ -114,19 +119,29 @@ export default async function AdminTransferDetail({
 
           {/* Asignación manual */}
           {!isFinal && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                {transfer.assignedToId ? "Reasignar celador" : "Asignar celador"}
-              </p>
-              <AssignForm
-                transferId={transfer.id}
-                celadores={celadores.map((c) => ({
-                  id:      c.id,
-                  name:    [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
-                  onBreak: !!(c.breakUntil && c.breakUntil > new Date()),
-                }))}
-                currentCeladorId={transfer.assignedToId ?? undefined}
-              />
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {transfer.assignedToId ? "Reasignar celador" : "Asignar celador"}
+                </p>
+                <span className="text-xs text-gray-400">{SHIFT_LABEL[currentShift]}</span>
+              </div>
+              {celadores.length === 0 ? (
+                <p className="text-xs text-amber-600 italic">
+                  No hay celadores con turno asignado para {SHIFT_LABEL[currentShift].toLowerCase()}.
+                  Asígnalos desde la gestión de usuarios.
+                </p>
+              ) : (
+                <AssignForm
+                  transferId={transfer.id}
+                  celadores={celadores.map((c) => ({
+                    id:      c.id,
+                    name:    [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
+                    onBreak: !!(c.breakUntil && c.breakUntil > now),
+                  }))}
+                  currentCeladorId={transfer.assignedToId ?? undefined}
+                />
+              )}
             </div>
           )}
         </Card>
