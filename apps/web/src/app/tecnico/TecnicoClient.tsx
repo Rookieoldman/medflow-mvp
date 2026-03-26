@@ -164,9 +164,21 @@ function TransferCard({
 }
 
 /* ── main component ── */
+const STATUS_OPTS = [
+  { value: "SOLICITADO", label: "Solicitado" },
+  { value: "ASIGNADO",   label: "Asignado"   },
+  { value: "EN_CURSO",   label: "En curso"   },
+  { value: "EN_PRUEBA",  label: "En prueba"  },
+  { value: "PAUSADO",    label: "Pausado"    },
+  { value: "FINALIZADO", label: "Finalizado" },
+  { value: "CANCELADO",  label: "Cancelado"  },
+];
+
 export default function TecnicoClient() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading,   setLoading]   = useState(true);
+  const [search,       setSearch]       = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchTransfers = async () => {
@@ -219,10 +231,6 @@ export default function TecnicoClient() {
     );
   }
 
-  /* ── Filtros cliente ── */
-  const [search,       setSearch]       = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-
   const filtered = transfers.filter((t) => {
     if (statusFilter && t.status !== statusFilter) return false;
     if (search) {
@@ -234,16 +242,6 @@ export default function TecnicoClient() {
 
   const needsAction = filtered.filter((t) => t.status === "EN_CURSO");
   const waiting     = filtered.filter((t) => t.status !== "EN_CURSO");
-
-  const STATUS_OPTS = [
-    { value: "SOLICITADO", label: "Solicitado" },
-    { value: "ASIGNADO",   label: "Asignado"   },
-    { value: "EN_CURSO",   label: "En curso"   },
-    { value: "EN_PRUEBA",  label: "En prueba"  },
-    { value: "PAUSADO",    label: "Pausado"    },
-    { value: "FINALIZADO", label: "Finalizado" },
-    { value: "CANCELADO",  label: "Cancelado"  },
-  ];
 
   return (
     <div className="space-y-4">
