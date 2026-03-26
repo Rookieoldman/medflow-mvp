@@ -6,6 +6,8 @@ import Link from "next/link";
 import { formatDateOnlyLocal, rangeFromYMD } from "@/lib/statsExplore";
 import type { StatsScopeKey } from "@/lib/adminStatsPeriod";
 import type { ExploreBlock } from "./loadData";
+import type { ExploreTrendsResult } from "./trends";
+import ExploreTrendsChart from "./ExploreTrendsChart";
 
 type Props = {
   initial: {
@@ -21,6 +23,8 @@ type Props = {
   };
   primary:   ExploreBlock;
   secondary: ExploreBlock | null;
+  trendsPrimary:   ExploreTrendsResult;
+  trendsSecondary: ExploreTrendsResult | null;
   pageTitle: string;
 };
 
@@ -33,6 +37,8 @@ export default function ExploreClient({
   initial,
   primary,
   secondary,
+  trendsPrimary,
+  trendsSecondary,
   pageTitle,
 }: Props) {
   const router = useRouter();
@@ -227,6 +233,19 @@ export default function ExploreClient({
         >
           Aplicar filtros
         </button>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-gray-800">Tendencias en el tiempo</h2>
+        <p className="text-xs text-gray-500 -mt-1">
+          Mismos filtros de ámbito y fechas que arriba. Al comparar períodos verás dos gráficos.
+        </p>
+        <div className={`grid gap-6 ${trendsSecondary ? "lg:grid-cols-2" : ""}`}>
+          <ExploreTrendsChart periodLabel="Período principal" result={trendsPrimary} />
+          {trendsSecondary ? (
+            <ExploreTrendsChart periodLabel="Período de comparación" result={trendsSecondary} />
+          ) : null}
+        </div>
       </section>
 
       <div className={`grid gap-6 ${secondary ? "lg:grid-cols-2" : ""}`}>

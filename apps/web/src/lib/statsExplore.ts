@@ -13,7 +13,13 @@ export type ExploreKpi =
   | "today_created"
   | "finished"
   | "cancelled"
-  | "incidents";
+  | "incidents"
+  /** Tiempo medio alta→cierre por bucket (tendencia) */
+  | "avg_closure_time"
+  /** % finalizados entre cierres (por bucket) */
+  | "success_among_closed"
+  /** % finalizados del día / creados del día (por bucket) */
+  | "completion_vs_created";
 
 export type ExploreDim = "status" | "testType" | "priority" | "difficulty" | "scope";
 
@@ -115,6 +121,9 @@ export function isExploreKpi(s: string | undefined): s is ExploreKpi {
     s === "today_created" ||
     s === "finished" ||
     s === "cancelled" ||
-    s === "incidents"
+    s === "incidents" ||
+    s === "avg_closure_time" ||
+    s === "success_among_closed" ||
+    s === "completion_vs_created"
   );
 }

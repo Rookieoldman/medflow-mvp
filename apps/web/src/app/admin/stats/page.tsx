@@ -452,7 +452,7 @@ function GlobalTab({
           value={data.finishedInPeriod > 0 ? `${data.avgTime} min` : "—"}
           href={
             data.finishedInPeriod > 0
-              ? kpiHref("finished")
+              ? kpiHref("avg_closure_time")
               : undefined
           }
         />
@@ -461,7 +461,7 @@ function GlobalTab({
       {/* Tasas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link
-          href={exploreUrl({ view: "breakdown", dim: "status", ...explore })}
+          href={exploreUrl({ view: "kpi", kpi: "success_among_closed", ...explore })}
           className="block border rounded-xl p-5 bg-white space-y-3 hover:ring-2 hover:ring-gray-200 transition-shadow"
         >
           <div className="flex items-center justify-between text-sm">
@@ -475,7 +475,7 @@ function GlobalTab({
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Finalizados / (finalizados + cancelados) según fecha de cierre. Clic para desglose por estado.
+            Finalizados / (finalizados + cancelados) según fecha de cierre. Clic para tendencia y resumen de cierres.
           </p>
           <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
             <div
@@ -485,7 +485,7 @@ function GlobalTab({
           </div>
         </Link>
         <Link
-          href={exploreUrl({ view: "breakdown", dim: "difficulty", ...explore })}
+          href={exploreUrl({ view: "kpi", kpi: "completion_vs_created", ...explore })}
           className="block border rounded-xl p-5 bg-white space-y-3 hover:ring-2 hover:ring-gray-200 transition-shadow"
         >
           <div className="flex items-center justify-between text-sm">
@@ -497,7 +497,7 @@ function GlobalTab({
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Clic para desglose por dificultad y comparar en el explorador.
+            Clic para tendencia por intervalo y comparar volumen creados vs finalizados.
           </p>
           <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
             <div
@@ -835,7 +835,7 @@ function CeladorTab({
         <Kpi
           label="T. medio global"
           value={`${data.globalAvgTime} min`}
-          href={exploreUrl({ view: "kpi", kpi: "finished", ...explore })}
+          href={exploreUrl({ view: "kpi", kpi: "avg_closure_time", ...explore })}
         />
       </section>
 

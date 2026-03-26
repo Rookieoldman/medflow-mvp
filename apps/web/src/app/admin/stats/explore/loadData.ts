@@ -182,7 +182,8 @@ async function loadKpi(
         total,
       };
     }
-    case "finished": {
+    case "finished":
+    case "avg_closure_time": {
       const rows = await prisma.transfer.findMany({
         where: {
           status:    "FINALIZADO",
@@ -202,9 +203,44 @@ async function loadKpi(
       });
       return {
         kind:  "list",
-        title: "Finalizados en el período (por fecha de cierre)",
+        title:
+          kpi === "avg_closure_time"
+            ? "Finalizados en el período (referencia para tiempo medio)"
+            : "Finalizados en el período (por fecha de cierre)",
         rows:  rows.map(mapTransfer),
         total,
+      };
+    }
+    case "success_among_closed": {
+      const fin = await prisma.transfer.count({
+        where: { status: "FINALIZADO", updatedAt: { gte: from, lte: to }, ...sw },
+      });
+      const can = await prisma.transfer.count({
+        where: { status: "CANCELADO", updatedAt: { gte: from, lte: to }, ...sw },
+      });
+      return {
+        kind:  "breakdown",
+        title: "Cierres en el período",
+        rows:  [
+          { key: "FIN", label: "Finalizados (fecha de cierre)", count: fin },
+          { key: "CAN", label: "Cancelados (fecha de cierre)", count: can },
+        ],
+      };
+    }
+    case "completion_vs_created": {
+      const cre = await prisma.transfer.count({
+        where: { createdAt: { gte: from, lte: to }, ...sw },
+      });
+      const fin = await prisma.transfer.count({
+        where: { status: "FINALIZADO", updatedAt: { gte: from, lte: to }, ...sw },
+      });
+      return {
+        kind:  "breakdown",
+        title: "Creados vs finalizados (cierre en período)",
+        rows:  [
+          { key: "CRE", label: "Creados en período", count: cre },
+          { key: "FIN", label: "Finalizados (cierre en período)", count: fin },
+        ],
       };
     }
     case "cancelled": {

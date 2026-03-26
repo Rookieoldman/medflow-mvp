@@ -6,18 +6,22 @@ import {
 } from "@/lib/statsExplore";
 import ExploreClient from "./ExploreClient";
 import { loadExploreBlock } from "./loadData";
+import { loadExploreTrends } from "./trends";
 
 export const dynamic = "force-dynamic";
 
 const KPI_TITLES: Record<string, string> = {
-  created:        "Explorar · Creados en período",
-  active_now:     "Explorar · Activos ahora",
-  urgent_active:  "Explorar · Urgentes activos",
-  urgent_period:  "Explorar · Urgentes en período",
-  today_created:  "Explorar · Creados hoy",
-  finished:       "Explorar · Finalizados",
-  cancelled:      "Explorar · Cancelados",
-  incidents:      "Explorar · Incidencias",
+  created:                 "Explorar · Creados en período",
+  active_now:              "Explorar · Activos ahora",
+  urgent_active:           "Explorar · Urgentes activos",
+  urgent_period:           "Explorar · Urgentes en período",
+  today_created:           "Explorar · Creados hoy",
+  finished:                "Explorar · Finalizados",
+  cancelled:               "Explorar · Cancelados",
+  incidents:               "Explorar · Incidencias",
+  avg_closure_time:        "Explorar · Tiempo medio hasta cierre",
+  success_among_closed:    "Explorar · Éxito entre cerrados",
+  completion_vs_created:   "Explorar · Finalizados / creados",
 };
 
 export default async function StatsExplorePage({
@@ -49,16 +53,26 @@ export default async function StatsExplorePage({
   const cFrom = sp.cFrom;
   const cTo   = sp.cTo;
 
-  const primary =
-    (await loadExploreBlock(view, kpi, dim, val, from, to, scope)) ??
-    (await loadExploreBlock("breakdown", undefined, "status", undefined, from, to, scope));
+  const trendCtx = { view, kpi, dim, val };
 
-  let secondary = null;
-  if (cFrom && cTo) {
-    secondary =
-      (await loadExploreBlock(view, kpi, dim, val, cFrom, cTo, scope)) ??
-      null;
-  }
+  const [primary, trendsPrimary, trendsSecondary, secondary] = await Promise.all([
+    (async () => {
+      return (
+        (await loadExploreBlock(view, kpi, dim, val, from, to, scope)) ??
+        (await loadExploreBlock("breakdown", undefined, "status", undefined, from, to, scope))
+      );
+    })(),
+    loadExploreTrends(from, to, scope, trendCtx),
+    cFrom && cTo ? loadExploreTrends(cFrom, cTo, scope, trendCtx) : Promise.resolve(null),
+    cFrom && cTo
+      ? (async () => {
+          return (
+            (await loadExploreBlock(view, kpi, dim, val, cFrom, cTo, scope)) ??
+            null
+          );
+        })()
+      : Promise.resolve(null),
+  ]);
 
   let pageTitle = "Explorar estadísticas";
   if (view === "kpi" && kpi) pageTitle = KPI_TITLES[kpi] ?? pageTitle;
@@ -81,6 +95,8 @@ export default async function StatsExplorePage({
         }}
         primary={primary!}
         secondary={secondary}
+        trendsPrimary={trendsPrimary}
+        trendsSecondary={trendsSecondary}
         pageTitle={pageTitle}
       />
     </main>
