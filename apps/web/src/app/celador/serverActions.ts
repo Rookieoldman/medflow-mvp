@@ -6,6 +6,13 @@ import { emitTransferEvent } from "@/lib/eventBus";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import {
+  breakUsedInCurrentShift,
+  getShift,
+  SHIFT_LABEL,
+  type ShiftName,
+} from "@/lib/shifts";
+import { Shift } from "@prisma/client";
 
 /* ============================================================
    ESTADOS SIMPLIFICADOS
@@ -252,4 +259,78 @@ export async function acceptTransfer(formData: FormData) {
   await recordEvent(transferId, celadorId, "EN_CURSO", "ASIGNADO", `Firmado por: ${signerName}`);
 
   revalidatePath("/celador");
+}
+
+/* ── Descanso y turno (mismo módulo que el resto de acciones: evita IDs rotos con Turbopack) ── */
+const BREAK_MINUTES = 20;
+const MIN_AVAILABLE = 2;
+
+export async function startBreak() {
+  const celadorId = await getCeladorSession();
+  const now       = new Date();
+
+  const user = await prisma.user.findUnique({
+    where:  { id: celadorId },
+    select: { breakUsedAt: true },
+  });
+
+  if (breakUsedInCurrentShift(user?.breakUsedAt ?? null, now)) {
+    const shift = getShift(now);
+    throw new Error(`Ya has usado el descanso del turno de ${SHIFT_LABEL[shift]}`);
+  }
+
+  const availableCount = await prisma.user.count({
+    where: {
+      id:     { not: celadorId },
+      role:   "CELADOR",
+      active: true,
+      OR:     [{ breakUntil: null }, { breakUntil: { lte: now } }],
+    },
+  });
+
+  if (availableCount < MIN_AVAILABLE) {
+    throw new Error(
+      `No puedes iniciar el descanso: deben quedar al menos ${MIN_AVAILABLE} celadores disponibles`
+    );
+  }
+
+  const breakUntil = new Date(now.getTime() + BREAK_MINUTES * 60 * 1000);
+
+  await prisma.user.update({
+    where: { id: celadorId },
+    data:  { breakUntil, breakUsedAt: now },
+  });
+
+  emitTransferEvent({ type: "celador:break", celadorId });
+  revalidatePath("/celador");
+}
+
+export async function endBreak() {
+  const celadorId = await getCeladorSession();
+
+  await prisma.user.update({
+    where: { id: celadorId },
+    data:  { breakUntil: null },
+  });
+
+  emitTransferEvent({ type: "celador:break", celadorId });
+  revalidatePath("/celador");
+}
+
+/** El celador cambia su turno activo; resetea descanso. */
+export async function setOwnShift(shift: ShiftName | "OFF") {
+  const celadorId = await getCeladorSession();
+
+  await prisma.user.update({
+    where: { id: celadorId },
+    data:  {
+      activeShift: shift === "OFF" ? null : (shift as Shift),
+      breakUsedAt: shift === "OFF" ? undefined : null,
+      breakUntil:  shift === "OFF" ? null : undefined,
+    },
+  });
+
+  emitTransferEvent({ type: "celador:break", celadorId });
+  revalidatePath("/celador");
+  revalidatePath("/admin");
 }
