@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import UserRow from "./UserRow";
 import Link from "next/link";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState, Pagination } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const PAGE_SIZE = 20;
 
 const ROLE_CONFIG = {
   ADMIN:    { label: "Admins",    color: "bg-purple-100 text-purple-800 border-purple-200" },
@@ -15,15 +17,21 @@ const ROLE_CONFIG = {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string }> | { role?: string };
+  searchParams: Promise<Record<string, string>> | Record<string, string>;
 }) {
-  const params = await Promise.resolve(searchParams as any);
+  const params     = await Promise.resolve(searchParams as any);
   const activeRole = params?.role as string | undefined;
+  const page       = Math.max(1, parseInt(params?.page ?? "1", 10));
 
-  const [users, roleCounts] = await Promise.all([
+  const where = activeRole ? { role: activeRole as any } : undefined;
+
+  const [total, users, roleCounts] = await Promise.all([
+    prisma.user.count({ where }),
     prisma.user.findMany({
-      where:   activeRole ? { role: activeRole as any } : undefined,
+      where,
       orderBy: [{ role: "asc" }, { lastName1: "asc" }],
+      skip:    (page - 1) * PAGE_SIZE,
+      take:    PAGE_SIZE,
       select:  {
         id: true, email: true, role: true, firstName: true,
         lastName1: true, lastName2: true, active: true,
@@ -33,9 +41,18 @@ export default async function AdminUsersPage({
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
   ]);
 
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
   const countByRole = Object.fromEntries(
     roleCounts.map((r) => [r.role, r._count._all])
   );
+
+  function buildHref(p: number) {
+    const params = new URLSearchParams();
+    if (activeRole) params.set("role", activeRole);
+    if (p > 1)      params.set("page", String(p));
+    return `/admin/users?${params.toString()}`;
+  }
 
   return (
     <section className="space-y-5">
@@ -88,28 +105,38 @@ export default async function AdminUsersPage({
       {users.length === 0 ? (
         <EmptyState title="No hay usuarios" subtitle="No hay usuarios con este filtro" icon="👤" />
       ) : (
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr className="text-left text-gray-500 font-medium">
-                  <th className="px-4 py-3">Nombre</th>
-                  <th className="px-4 py-3 hidden sm:table-cell">Email</th>
-                  <th className="px-4 py-3">Rol</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3 hidden md:table-cell">Alta</th>
-                  <th className="px-4 py-3">Turno</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {users.map((u) => (
-                  <UserRow key={u.id} user={u} />
-                ))}
-              </tbody>
-            </table>
+        <>
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr className="text-left text-gray-500 font-medium">
+                    <th className="px-4 py-3">Nombre</th>
+                    <th className="px-4 py-3 hidden sm:table-cell">Email</th>
+                    <th className="px-4 py-3">Rol</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3 hidden md:table-cell">Alta</th>
+                    <th className="px-4 py-3">Turno</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {users.map((u) => (
+                    <UserRow key={u.id} user={u} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={PAGE_SIZE}
+            buildHref={buildHref}
+          />
+        </>
       )}
     </section>
   );

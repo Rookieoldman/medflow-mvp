@@ -50,6 +50,7 @@ export default function AdminFilters({ users }: { users: User[] }) {
     if (testType)   sp.set("testType",   testType);
     if (difficulty) sp.set("difficulty", difficulty);
     if (dateRange)  sp.set("dateRange",  dateRange);
+    // Siempre vuelve a la página 1 al aplicar filtros
     router.push(`/admin/transfers?${sp.toString()}`);
   }, [search, tecnicoId, celadorId, status, priority, testType, difficulty, dateRange, router]);
 
