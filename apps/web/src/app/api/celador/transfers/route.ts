@@ -19,10 +19,12 @@ export async function GET() {
     where:  { id: celadorId },
     select: { breakUntil: true, breakUsedAt: true, activeShift: true },
   });
-  const onBreak      = !!(celador?.breakUntil && celador.breakUntil > now);
-  const breakUntil   = onBreak ? celador!.breakUntil!.toISOString() : null;
+  const onBreak        = !!(celador?.breakUntil && celador.breakUntil > now);
+  const breakUntil     = onBreak ? celador!.breakUntil!.toISOString() : null;
   const breakAvailable = !breakUsedInCurrentShift(celador?.breakUsedAt ?? null, now);
-  const currentShift   = getShift(now);
+  // El turno mostrado es el que el celador ha seleccionado explícitamente;
+  // si no ha asignado ninguno, se calcula por la hora actual como fallback.
+  const currentShift   = (celador?.activeShift ?? getShift(now)) as string;
 
   /* ===========================
      TRASLADOS DISPONIBLES
