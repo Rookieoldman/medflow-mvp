@@ -100,9 +100,9 @@ export default function Toaster() {
 
       es.onmessage = (e) => {
         try {
-          const event: MedflowEvent & { type: string } = JSON.parse(e.data);
-          if (event.type === "connected") return;
-          const toast = toastFromEvent(event as MedflowEvent);
+          const raw = JSON.parse(e.data) as Record<string, unknown>;
+          if (raw.type === "connected") return;
+          const toast = toastFromEvent(raw as unknown as MedflowEvent);
           if (toast) addToast(toast);
         } catch {
           // ignorar mensajes malformados
