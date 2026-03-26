@@ -1,7 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { DIFFICULTY_WEIGHT } from "@/lib/sla";
 import Link from "next/link";
+import {
+  parseStatsPeriod,
+  parseStatsScope,
+  periodStartDate,
+  todayStart,
+  whereCreatedInPeriod,
+  whereActiveSnapshot,
+  whereFinalizedInPeriod,
+  whereCancelledInPeriod,
+  whereScopeOnly,
+  type StatsPeriodKey,
+  type StatsScopeKey,
+} from "@/lib/adminStatsPeriod";
 import ChartsClient from "./ChartsClient";
+import StatsPeriodFilters from "./StatsPeriodFilters";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +69,15 @@ export default async function StatsPage({
   const raw  = sp?.tab ?? "global";
   const tab: Tab = (TABS.some((t) => t.id === raw) ? raw : "global") as Tab;
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const periodKey = parseStatsPeriod(sp?.period);
+  const scopeKey  = parseStatsScope(sp?.scope);
+  const pStart    = periodStartDate(periodKey);
+  const dayStart  = todayStart();
+
+  const whereCreated = whereCreatedInPeriod(pStart, scopeKey);
+  const whereActive  = whereActiveSnapshot(scopeKey);
+  const whereFin     = whereFinalizedInPeriod(pStart, scopeKey);
+  const whereCan     = whereCancelledInPeriod(pStart, scopeKey);
 
   /* ── PER-TAB FETCHING ── */
 
@@ -64,46 +85,91 @@ export default async function StatsPage({
   let global: GlobalData | null = null;
   if (tab === "global") {
     const [
-      total,
-      urgent,
-      today,
+      createdInPeriod,
+      activeNow,
+      urgentActive,
+      createdToday,
+      urgentInPeriod,
       byStatus,
       byTestType,
       byPriority,
       byDifficulty,
-      finished,
-      cancelledCount,
+      byScope,
+      finishedInPeriod,
+      cancelledInPeriod,
+      incidentsInPeriod,
     ] = await Promise.all([
-      prisma.transfer.count(),
-      prisma.transfer.count({ where: { priority: "URGENTE" } }),
-      prisma.transfer.count({ where: { createdAt: { gte: todayStart } } }),
-      prisma.transfer.groupBy({ by: ["status"],     _count: true }),
-      prisma.transfer.groupBy({ by: ["testType"],   _count: true }),
-      prisma.transfer.groupBy({ by: ["priority"],   _count: true }),
-      prisma.transfer.groupBy({ by: ["difficulty"], _count: true }),
+      prisma.transfer.count({ where: whereCreated }),
+      prisma.transfer.count({ where: whereActive }),
+      prisma.transfer.count({
+        where: { ...whereActive, priority: "URGENTE" },
+      }),
+      prisma.transfer.count({
+        where: { createdAt: { gte: dayStart }, ...whereScopeOnly(scopeKey) },
+      }),
+      prisma.transfer.count({
+        where: { ...whereCreated, priority: "URGENTE" },
+      }),
+      prisma.transfer.groupBy({ by: ["status"],     where: whereCreated, _count: true }),
+      prisma.transfer.groupBy({ by: ["testType"],   where: whereCreated, _count: true }),
+      prisma.transfer.groupBy({ by: ["priority"],   where: whereCreated, _count: true }),
+      prisma.transfer.groupBy({ by: ["difficulty"], where: whereCreated, _count: true }),
+      prisma.transfer.groupBy({ by: ["scope"],      where: whereCreated, _count: true }),
       prisma.transfer.findMany({
-        where: { status: "FINALIZADO" },
+        where: whereFin,
         select: { createdAt: true, updatedAt: true },
       }),
-      prisma.transfer.count({ where: { status: "CANCELADO" } }),
+      prisma.transfer.count({ where: whereCan }),
+      prisma.incident.count({
+        where: {
+          ...(pStart ? { createdAt: { gte: pStart } } : {}),
+          ...(scopeKey
+            ? { transfer: { scope: scopeKey as "PLANTA" | "URGENCIAS" } }
+            : {}),
+        },
+      }),
     ]);
 
     const avgTime =
-      finished.length > 0
+      finishedInPeriod.length > 0
         ? Math.round(
-            finished.reduce(
+            finishedInPeriod.reduce(
               (a, t) => a + (t.updatedAt.getTime() - t.createdAt.getTime()) / 60000,
               0
-            ) / finished.length
+            ) / finishedInPeriod.length
           )
         : 0;
 
-    const active = total - finished.length - cancelledCount;
-    const completionRate = total > 0 ? Math.round((finished.length / total) * 100) : 0;
+    const closedInPeriod = finishedInPeriod.length + cancelledInPeriod;
+    const successAmongClosed =
+      closedInPeriod > 0
+        ? Math.round((finishedInPeriod.length / closedInPeriod) * 100)
+        : 0;
+
+    const completionVsCreated =
+      createdInPeriod > 0
+        ? Math.round((finishedInPeriod.length / createdInPeriod) * 100)
+        : 0;
 
     global = {
-      total, urgent, today, byStatus, byTestType, byPriority, byDifficulty,
-      avgTime, active, finishedCount: finished.length, cancelledCount, completionRate,
+      periodKey,
+      scopeKey,
+      createdInPeriod,
+      activeNow,
+      urgentActive,
+      createdToday,
+      urgentInPeriod,
+      byStatus,
+      byTestType,
+      byPriority,
+      byDifficulty,
+      byScope,
+      avgTime,
+      finishedInPeriod: finishedInPeriod.length,
+      cancelledInPeriod,
+      incidentsInPeriod,
+      successAmongClosed,
+      completionVsCreated,
     };
   }
 
@@ -114,6 +180,7 @@ export default async function StatsPage({
       where: { role: "TECNICO" },
       include: {
         transfersCreated: {
+          where: whereCreated,
           select: { id: true, priority: true, status: true, difficulty: true },
         },
       },
@@ -155,6 +222,7 @@ export default async function StatsPage({
       where: { role: "CELADOR" },
       include: {
         transfersAssigned: {
+          where: whereCreated,
           select: { id: true, priority: true, status: true, difficulty: true, createdAt: true, updatedAt: true },
         },
       },
@@ -185,7 +253,7 @@ export default async function StatsPage({
         const active    = u.transfersAssigned.filter((t) => !["FINALIZADO","CANCELADO"].includes(t.status)).length;
         const urgent    = done.filter((t) => t.priority === "URGENTE").length;
         const critico   = done.filter((t) => t.difficulty === "CRITICO").length;
-        const todayDone = done.filter((t) => t.updatedAt >= todayStart).length;
+        const todayDone = done.filter((t) => t.updatedAt >= dayStart).length;
         const avgTime =
           done.length > 0
             ? Math.round(
@@ -224,20 +292,28 @@ export default async function StatsPage({
 
       {/* TABS */}
       <nav className="flex border-b border-gray-200">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={`/admin/stats?tab=${t.id}`}
-            className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t.id
-                ? "border-gray-900 text-gray-900"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
+        {TABS.map((t) => {
+          const q = new URLSearchParams();
+          q.set("tab", t.id);
+          q.set("period", periodKey);
+          if (scopeKey) q.set("scope", scopeKey);
+          return (
+            <Link
+              key={t.id}
+              href={`/admin/stats?${q.toString()}`}
+              className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                tab === t.id
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
       </nav>
+
+      <StatsPeriodFilters period={periodKey} scope={scopeKey} activeTab={tab} />
 
       {/* CONTENT */}
       {tab === "global"  && global  && <GlobalTab  data={global}  />}
@@ -261,19 +337,30 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   CRITICO:  "bg-red-500",
 };
 
+const SCOPE_CHART_LABELS: Record<string, string> = {
+  PLANTA:    "Planta",
+  URGENCIAS: "Urgencias",
+};
+
 type GlobalData = {
-  total:          number;
-  urgent:         number;
-  today:          number;
-  byStatus:       { status: string; _count: number }[];
-  byTestType:     { testType: string; _count: number }[];
-  byPriority:     { priority: string; _count: number }[];
-  byDifficulty:   { difficulty: string; _count: number }[];
-  avgTime:        number;
-  active:         number;
-  finishedCount:  number;
-  cancelledCount: number;
-  completionRate: number;
+  periodKey:            StatsPeriodKey;
+  scopeKey:             StatsScopeKey;
+  createdInPeriod:      number;
+  activeNow:            number;
+  urgentActive:         number;
+  createdToday:         number;
+  urgentInPeriod:       number;
+  byStatus:             { status: string; _count: number }[];
+  byTestType:           { testType: string; _count: number }[];
+  byPriority:           { priority: string; _count: number }[];
+  byDifficulty:         { difficulty: string; _count: number }[];
+  byScope:              { scope: string; _count: number }[];
+  avgTime:              number;
+  finishedInPeriod:     number;
+  cancelledInPeriod:    number;
+  incidentsInPeriod:    number;
+  successAmongClosed:   number;
+  completionVsCreated:  number;
 };
 
 function GlobalTab({ data }: { data: GlobalData }) {
@@ -281,9 +368,12 @@ function GlobalTab({ data }: { data: GlobalData }) {
   const chartTestTypeData = data.byTestType.map((t) => ({ name: TEST_LABELS[t.testType] ?? t.testType, value: t._count }));
   const chartPriorityData = data.byPriority.map((p) => ({ name: p.priority === "URGENTE" ? "Urgente" : "Normal", value: p._count }));
 
-  const maxStatus     = Math.max(...data.byStatus.map((s) => s._count), 1);
-  const maxDifficulty = Math.max(...data.byDifficulty.map((d) => d._count), 1);
+  const maxStatus =
+    data.byStatus.length > 0 ? Math.max(...data.byStatus.map((s) => s._count), 1) : 1;
+  const maxDifficulty =
+    data.byDifficulty.length > 0 ? Math.max(...data.byDifficulty.map((d) => d._count), 1) : 1;
   const totalDiff     = data.byDifficulty.reduce((a, d) => a + d._count, 0) || 1;
+  const totalScope    = data.byScope.reduce((a, s) => a + s._count, 0) || 1;
 
   const diffOrder = ["BANAL", "MODERADO", "CRITICO"];
   const byDiffSorted = [...data.byDifficulty].sort(
@@ -293,29 +383,64 @@ function GlobalTab({ data }: { data: GlobalData }) {
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <Kpi label="Total"       value={data.total}             />
-        <Kpi label="Activos"     value={data.active}            />
-        <Kpi label="Finalizados" value={data.finishedCount}     />
-        <Kpi label="Cancelados"  value={data.cancelledCount}    />
-        <Kpi label="Urgentes"    value={data.urgent}            />
-        <Kpi label="Hoy"         value={data.today}             />
-        <Kpi label="T. medio"    value={`${data.avgTime} min`}  />
+      <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <Kpi label="Creados (período)"     value={data.createdInPeriod} />
+        <Kpi label="Activos ahora"         value={data.activeNow} />
+        <Kpi label="Urgentes activos"      value={data.urgentActive} />
+        <Kpi label="Urgentes (en período)" value={data.urgentInPeriod} />
+        <Kpi label="Creados hoy"           value={data.createdToday} />
+        <Kpi label="Incidencias (período)" value={data.incidentsInPeriod} />
+        <Kpi label="Finalizados (período)" value={data.finishedInPeriod} />
+        <Kpi label="Cancelados (período)"  value={data.cancelledInPeriod} />
+        <Kpi
+          label="T. medio cierre"
+          value={data.finishedInPeriod > 0 ? `${data.avgTime} min` : "—"}
+        />
       </section>
 
-      {/* COMPLETION RATE */}
-      <section className="border rounded-xl p-5 bg-white space-y-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-700">Tasa de finalización</span>
-          <span className="font-semibold text-gray-900">{data.completionRate}%</span>
-        </div>
-        <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-green-500 transition-all"
-            style={{ width: `${data.completionRate}%` }}
-          />
-        </div>
-      </section>
+      {/* Tasas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="border rounded-xl p-5 bg-white space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-700">
+              Éxito entre cerrados en período
+            </span>
+            <span className="font-semibold text-gray-900">
+              {data.finishedInPeriod + data.cancelledInPeriod > 0
+                ? `${data.successAmongClosed}%`
+                : "—"}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            Finalizados / (finalizados + cancelados) según fecha de cierre en el período.
+          </p>
+          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-green-500 transition-all"
+              style={{ width: `${data.successAmongClosed}%` }}
+            />
+          </div>
+        </section>
+        <section className="border rounded-xl p-5 bg-white space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-700">
+              Finalizados / creados en período
+            </span>
+            <span className="font-semibold text-gray-900">
+              {data.createdInPeriod > 0 ? `${data.completionVsCreated}%` : "—"}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            Indicador orientativo: muchos creados al final del período pueden seguir abiertos.
+          </p>
+          <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-indigo-500 transition-all"
+              style={{ width: `${data.completionVsCreated}%` }}
+            />
+          </div>
+        </section>
+      </div>
 
       {/* DIFFICULTY + STATUS breakdown — 2 cols */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -385,6 +510,35 @@ function GlobalTab({ data }: { data: GlobalData }) {
         </section>
       </div>
 
+      {/* Ámbito: solo tiene sentido comparar si no hay filtro único de ámbito */}
+      {data.byScope.length > 0 && (
+        <section className="border rounded-xl p-5 bg-white space-y-4">
+          <h2 className="font-semibold text-gray-800">
+            Creados en período por ámbito
+            {data.scopeKey ? " (filtro activo)" : ""}
+          </h2>
+          <div className="flex h-5 rounded-full overflow-hidden gap-0.5 max-w-xl">
+            {data.byScope.map((s) => (
+              <div
+                key={s.scope}
+                className={`${s.scope === "URGENCIAS" ? "bg-rose-500" : "bg-sky-500"} transition-all`}
+                style={{ width: `${Math.round((s._count / totalScope) * 100)}%` }}
+                title={`${SCOPE_CHART_LABELS[s.scope] ?? s.scope}: ${s._count}`}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            {data.byScope.map((s) => (
+              <span key={s.scope} className="text-gray-700">
+                <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${s.scope === "URGENCIAS" ? "bg-rose-500" : "bg-sky-500"}`} />
+                {SCOPE_CHART_LABELS[s.scope] ?? s.scope}: <strong>{s._count}</strong> (
+                {Math.round((s._count / totalScope) * 100)}%)
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* CHARTS (recharts) */}
       <ChartsClient
         byStatus={chartStatusData}
@@ -416,6 +570,10 @@ type TecnicoData = {
 function TecnicoTab({ data }: { data: TecnicoData }) {
   return (
     <div className="space-y-6">
+      <p className="text-xs text-gray-500 border border-dashed border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+        Las cifras y el ranking usan solo traslados <strong>creados</strong> en el período y ámbito
+        seleccionados arriba.
+      </p>
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Técnicos activos" value={data.activeTecs}   />
@@ -518,6 +676,10 @@ type CeladorData = {
 function CeladorTab({ data }: { data: CeladorData }) {
   return (
     <div className="space-y-6">
+      <p className="text-xs text-gray-500 border border-dashed border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+        El ranking usa traslados <strong>creados</strong> en el período y ámbito seleccionados (asignaciones
+        ligadas a esas solicitudes).
+      </p>
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Celadores activos" value={data.activeCeladors}         />
