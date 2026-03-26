@@ -18,6 +18,11 @@ export async function middleware(req: NextRequest) {
 
   const role = token.role as string;
 
+  // Mi cuenta: cualquier usuario autenticado
+  if (pathname.startsWith("/account")) {
+    return NextResponse.next();
+  }
+
   // 🔒 PROTECCIÓN POR ROL
 
   // Técnico
@@ -61,6 +66,8 @@ export const config = {
     "/transfer/:path*",
     "/celador/:path*",
     "/admin/:path*",
+    "/account",
+    "/account/:path*",
     "/login",
   ],
 };

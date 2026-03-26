@@ -1,6 +1,7 @@
 import "./globals.css";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import Toaster from "@/components/Toaster";
 import PwaRegister from "@/components/PwaRegister";
@@ -61,7 +62,15 @@ export default async function RootLayout({
               {ROLE_LABEL[user?.role] ?? user?.role}
             </span>
 
-            <LogoutButton />
+            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+              <Link
+                href="/account"
+                className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2"
+              >
+                Mi cuenta
+              </Link>
+              <LogoutButton />
+            </div>
           </header>
         )}
 
