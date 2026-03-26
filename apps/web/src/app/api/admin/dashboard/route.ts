@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAtRisk } from "@/lib/sla";
-import { getShift } from "@/lib/shifts";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +14,8 @@ export async function GET() {
     return new NextResponse("No autorizado", { status: 401 });
   }
 
-  const now          = new Date();
-  const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const currentShift = getShift(now);
+  const now        = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const [rawTransfers, celadores] = await Promise.all([
     prisma.transfer.findMany({
@@ -37,9 +35,8 @@ export async function GET() {
       },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     }),
-    // Solo celadores con el turno activo que coincide con el turno actual
     prisma.user.findMany({
-      where:   { role: "CELADOR", active: true, activeShift: currentShift },
+      where:   { role: "CELADOR", active: true },
       select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
       orderBy: { firstName: "asc" },
     }),

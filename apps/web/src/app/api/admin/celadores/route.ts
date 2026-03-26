@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getShift } from "@/lib/shifts";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +11,10 @@ export async function GET() {
     return new NextResponse("No autorizado", { status: 401 });
   }
 
-  const now          = new Date();
-  const currentShift = getShift(now);
+  const now = new Date();
 
   const celadores = await prisma.user.findMany({
-    where:   { role: "CELADOR", active: true, activeShift: currentShift },
+    where:   { role: "CELADOR", active: true },
     select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
     orderBy: { firstName: "asc" },
   });
