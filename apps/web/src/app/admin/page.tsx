@@ -13,7 +13,7 @@ export default async function AdminDashboardPage() {
 
   const celadores = await prisma.user.findMany({
     where:   { role: "CELADOR", active: true },
-    select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true },
+    select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
     orderBy: { firstName: "asc" },
   });
 
@@ -55,10 +55,11 @@ export default async function AdminDashboardPage() {
   }));
 
   const celadorStatus = celadores.map((c) => ({
-    id:        c.id,
-    name:      [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
-    onBreak:   !!(c.breakUntil && c.breakUntil > now),
-    breakUntil: c.breakUntil?.toISOString() ?? null,
+    id:          c.id,
+    name:        [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
+    onBreak:     !!(c.breakUntil && c.breakUntil > now),
+    breakUntil:  c.breakUntil?.toISOString() ?? null,
+    activeShift: c.activeShift ?? null,
   }));
 
   return (

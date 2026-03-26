@@ -17,9 +17,10 @@ model User {
   firstName String?
   lastName1 String?
   lastName2 String?
-  active      Boolean   @default(true)
-  breakUntil  DateTime?
-  breakUsedAt DateTime?
+  active       Boolean   @default(true)
+  activeShift  Shift?
+  breakUntil   DateTime?
+  breakUsedAt  DateTime?
 
   // RELACIONES
   transfersCreated  Transfer[] @relation("TransfersCreated")

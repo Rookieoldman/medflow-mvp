@@ -27,7 +27,7 @@ export default async function AdminUsersPage({
       select:  {
         id: true, email: true, role: true, firstName: true,
         lastName1: true, lastName2: true, active: true,
-        createdAt: true, breakUntil: true,
+        createdAt: true, breakUntil: true, activeShift: true,
       },
     }),
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
@@ -98,6 +98,7 @@ export default async function AdminUsersPage({
                   <th className="px-4 py-3">Rol</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3 hidden md:table-cell">Alta</th>
+                  <th className="px-4 py-3">Turno</th>
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>

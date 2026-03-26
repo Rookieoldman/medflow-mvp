@@ -1,16 +1,18 @@
-import UserActions from "./UserActions";
-import { fDate } from "@/lib/format";
+import UserActions    from "./UserActions";
+import ShiftSelector  from "./ShiftSelector";
+import { fDate }      from "@/lib/format";
 
 type User = {
-  id:         string;
-  email:      string;
-  role:       string;
-  firstName:  string | null;
-  lastName1:  string | null;
-  lastName2:  string | null;
-  active:     boolean;
-  createdAt:  Date;
-  breakUntil: Date | null;
+  id:          string;
+  email:       string;
+  role:        string;
+  firstName:   string | null;
+  lastName1:   string | null;
+  lastName2:   string | null;
+  active:      boolean;
+  createdAt:   Date;
+  breakUntil:  Date | null;
+  activeShift: string | null;
 };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -72,6 +74,15 @@ export default function UserRow({ user }: { user: User }) {
 
       <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell whitespace-nowrap">
         {fDate(user.createdAt)}
+      </td>
+
+      {/* Selector de turno — solo para celadores */}
+      <td className="px-4 py-3">
+        {user.role === "CELADOR" && user.active ? (
+          <ShiftSelector userId={user.id} currentShift={user.activeShift} />
+        ) : (
+          <span className="text-gray-200">—</span>
+        )}
       </td>
 
       <td className="px-4 py-3">

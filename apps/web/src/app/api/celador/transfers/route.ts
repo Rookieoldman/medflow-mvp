@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { getShift, breakUsedInCurrentShift } from "@/lib/shifts";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -16,16 +17,12 @@ export async function GET() {
   const now     = new Date();
   const celador = await prisma.user.findUnique({
     where:  { id: celadorId },
-    select: { breakUntil: true, breakUsedAt: true },
+    select: { breakUntil: true, breakUsedAt: true, activeShift: true },
   });
   const onBreak      = !!(celador?.breakUntil && celador.breakUntil > now);
   const breakUntil   = onBreak ? celador!.breakUntil!.toISOString() : null;
-  const breakAvailable = !(
-    celador?.breakUsedAt &&
-    celador.breakUsedAt.getFullYear() === now.getFullYear() &&
-    celador.breakUsedAt.getMonth()    === now.getMonth()    &&
-    celador.breakUsedAt.getDate()     === now.getDate()
-  );
+  const breakAvailable = !breakUsedInCurrentShift(celador?.breakUsedAt ?? null, now);
+  const currentShift   = getShift(now);
 
   /* ===========================
      TRASLADOS DISPONIBLES
@@ -85,5 +82,13 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ available, mine, onBreak, breakUntil, breakAvailable });
+  return NextResponse.json({
+    available,
+    mine,
+    onBreak,
+    breakUntil,
+    breakAvailable,
+    currentShift,                          // calculado por hora, siempre presente
+    activeShift: celador?.activeShift ?? null, // asignación manual del admin (informativa)
+  });
 }

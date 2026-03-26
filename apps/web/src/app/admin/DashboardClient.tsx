@@ -16,11 +16,25 @@ type Transfer = {
 
 type StatusEntry = { status: string; count: number };
 
+const SHIFT_LABEL: Record<string, string> = {
+  MANANA: "☀️ Mañana (08–15h)",
+  TARDE:  "🌆 Tarde  (15–22h)",
+  NOCHE:  "🌙 Noche  (22–08h)",
+};
+
+function getShiftFromTime(now: number): string {
+  const h = new Date(now).getHours();
+  if (h >= 8  && h < 15) return "MANANA";
+  if (h >= 15 && h < 22) return "TARDE";
+  return "NOCHE";
+}
+
 type CeladorEntry = {
-  id:         string;
-  name:       string;
-  onBreak:    boolean;
-  breakUntil: string | null;
+  id:          string;
+  name:        string;
+  onBreak:     boolean;
+  breakUntil:  string | null;
+  activeShift: string | null;
 };
 
 type Props = {
@@ -122,10 +136,10 @@ export default function DashboardClient({
         <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Celadores disponibles
+              Celadores · {SHIFT_LABEL[getShiftFromTime(now)]}
             </h2>
             <span className="text-xs text-gray-400">
-              {celadores.filter((c) => !c.onBreak || (c.breakUntil && new Date(c.breakUntil) <= new Date(now))).length}
+              {celadores.filter((c) => !(c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now))).length}
               &nbsp;/&nbsp;{celadores.length} disponibles
             </span>
           </div>
@@ -146,7 +160,7 @@ export default function DashboardClient({
                   </div>
                   {isOnBreak ? (
                     <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">
-                      ☕ Descanso — {mm}:{ss}
+                      ☕ {mm}:{ss}
                     </span>
                   ) : (
                     <span className="text-xs text-green-600 font-medium shrink-0">Disponible</span>

@@ -61,6 +61,18 @@ const DIFFICULTY_BORDER: Record<string, string> = {
   BANAL:    "border-l-green-400",
 };
 
+const SHIFT_LABEL: Record<string, string> = {
+  MANANA: "☀️ Turno de mañana  (08–15h)",
+  TARDE:  "🌆 Turno de tarde   (15–22h)",
+  NOCHE:  "🌙 Turno de noche   (22–08h)",
+};
+
+const SHIFT_COLOR: Record<string, string> = {
+  MANANA: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  TARDE:  "bg-orange-50 text-orange-700 border-orange-200",
+  NOCHE:  "bg-indigo-50 text-indigo-700 border-indigo-200",
+};
+
 const STATUS_CTX: Record<string, string> = {
   ASIGNADO:  "Pendiente de firma del responsable",
   EN_CURSO:  "Traslado en curso",
@@ -75,10 +87,11 @@ export default function CeladorClient() {
   const [mine,       setMine]       = useState<Transfer[]>([]);
   const [pendingId,  setPendingId]  = useState<string | null>(null);
   const [openSig,    setOpenSig]    = useState<string | null>(null);
-  const [onBreak,       setOnBreak]       = useState(false);
-  const [breakUntil,    setBreakUntil]    = useState<string | null>(null);
+  const [onBreak,        setOnBreak]        = useState(false);
+  const [breakUntil,     setBreakUntil]     = useState<string | null>(null);
   const [breakAvailable, setBreakAvailable] = useState(true);
-  const [breakPending,  startBreakTransition] = useTransition();
+  const [currentShift,   setCurrentShift]   = useState<string | null>(null);
+  const [breakPending,   startBreakTransition] = useTransition();
   const breakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -91,6 +104,7 @@ export default function CeladorClient() {
       setOnBreak(data.onBreak ?? false);
       setBreakUntil(data.breakUntil ?? null);
       setBreakAvailable(data.breakAvailable ?? true);
+      setCurrentShift(data.currentShift ?? null);
       if (pendingId) {
         const exists =
           data.available?.some((t: Transfer) => t.id === pendingId) ||
@@ -157,6 +171,17 @@ export default function CeladorClient() {
 
   return (
     <>
+      {/* ════════════════════════════════════════
+          TURNO ACTIVO
+      ════════════════════════════════════════ */}
+      <div className="flex items-center justify-between gap-2">
+        {currentShift && (
+          <span className={`text-xs font-medium border rounded-lg px-3 py-1.5 ${SHIFT_COLOR[currentShift] ?? ""}`}>
+            {SHIFT_LABEL[currentShift] ?? currentShift}
+          </span>
+        )}
+      </div>
+
       {/* ════════════════════════════════════════
           ESTADO DE DESCANSO
       ════════════════════════════════════════ */}
