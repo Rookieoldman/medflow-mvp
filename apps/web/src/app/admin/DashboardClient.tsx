@@ -46,6 +46,20 @@ type Props = {
   celadores:       CeladorEntry[];
 };
 
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex items-center">
+      <span className="w-3.5 h-3.5 rounded-full border border-gray-400 text-gray-400 text-[9px] font-bold flex items-center justify-center cursor-default select-none leading-none">
+        i
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-900 text-white text-xs leading-relaxed px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </span>
+    </span>
+  );
+}
+
 const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
   SOLICITADO: { label: "Solicitado", dot: "bg-amber-400"  },
   ASIGNADO:   { label: "Asignado",   dot: "bg-blue-400"   },
@@ -156,14 +170,20 @@ export default function DashboardClient({
           <p className="text-xs text-gray-400 mt-1">traslados en curso</p>
         </div>
         <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">En riesgo SLA</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+            En riesgo SLA
+            <InfoTooltip text="Traslados que llevan más tiempo del permitido en su estado actual según su dificultad y prioridad. Requieren atención inmediata." />
+          </p>
           <p className={`text-4xl font-bold mt-1 ${riskColor}`}>{liveRiskCount}</p>
           <p className="text-xs text-gray-400 mt-1">superan el umbral</p>
         </div>
         <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cumplimiento SLA</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+            Cumplimiento SLA
+            <InfoTooltip text="SLA (Service Level Agreement): porcentaje de traslados activos que están dentro del tiempo máximo permitido según su dificultad y prioridad." />
+          </p>
           <p className={`text-4xl font-bold mt-1 ${slaColor}`}>{liveSla}%</p>
-          <p className="text-xs text-gray-400 mt-1">en tiempo real · actualiza c/10s</p>
+          <p className="text-xs text-gray-400 mt-1">en tiempo real · actualiza c/30s</p>
         </div>
       </div>
 
