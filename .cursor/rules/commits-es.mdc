@@ -1,0 +1,39 @@
+---
+description: Mensajes de commit en español que expliquen lo implementado
+alwaysApply: true
+---
+
+# Commits en español
+
+Al preparar o sugerir commits en este repositorio (`medflow-mvp`):
+
+## Idioma
+- **Siempre en español**: título y cuerpo del mensaje.
+- Evita títulos solo en inglés salvo nombres propios inevitables (Next.js, Prisma, etc.).
+
+## Título (primera línea)
+- Frase **corta y concreta** (orientación: hasta ~72 caracteres).
+- Indica **qué** se hace, en tono descriptivo o imperativo: *Añade…*, *Corrige…*, *Implementa…*, *Refactoriza…*.
+- Opcional: prefijo de ámbito: `feat(admin): …`, `fix(celador): …`, `chore: …`.
+
+## Cuerpo (recomendado cuando el cambio no es trivial)
+Dejar una línea en blanco tras el título y **explicar lo implementado**:
+- Qué funcionalidad o corrección incluye el cambio.
+- Qué archivos o áreas toca si ayuda al contexto (rutas, roles, APIs).
+- Motivo breve si no es obvio (por ejemplo: “evita IDs de server actions rotos con Turbopack”).
+
+Usar viñetas con `-` si hay varios puntos.
+
+## Ejemplo
+
+```
+feat: página Mi cuenta y cambio de contraseña para todos los roles
+
+- Nueva ruta /account con perfil (nombre, email, rol) y formulario de contraseña.
+- Acción de servidor con bcrypt; validación de longitud y confirmación.
+- Middleware y cabecera global enlazan la página para técnico, celador y admin.
+```
+
+## Qué evitar
+- Mensajes genéricos: “cambios”, “fixes”, “update”, “WIP” sin detalle.
+- Mezclar muchos temas no relacionados en un solo commit (mejor varios commits claros).
