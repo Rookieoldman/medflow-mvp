@@ -3,6 +3,26 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import LogoutButton from "@/components/LogoutButton";
 import Toaster from "@/components/Toaster";
+import PwaRegister from "@/components/PwaRegister";
+import type { Metadata, Viewport } from "next";
+
+export const metadata: Metadata = {
+  title:       "MedFlow",
+  description: "Gestión de traslados hospitalarios",
+  manifest:    "/manifest.json",
+  appleWebApp: {
+    capable:       true,
+    statusBarStyle: "black-translucent",
+    title:          "MedFlow",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor:    "#111827",
+  width:         "device-width",
+  initialScale:  1,
+  maximumScale:  1,
+};
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN:   "Admin",
@@ -47,6 +67,7 @@ export default async function RootLayout({
 
         <div className="min-h-[calc(100vh-57px)]">{children}</div>
         {session && <Toaster />}
+        {session && <PwaRegister />}
       </body>
     </html>
   );

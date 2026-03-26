@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
 import { emitTransferEvent } from "@/lib/eventBus";
+import { sendPushToUser } from "@/lib/webpush";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { revalidatePath } from "next/cache";
@@ -50,6 +51,15 @@ export async function setTransferStatus(formData: FormData) {
     mrn:        transfer.mrn,
     patientName: transfer.patientFullName,
   });
+
+  // Push al celador cuando el paciente está en la sala (EN_PRUEBA)
+  if (next === "EN_PRUEBA" && transfer.assignedToId) {
+    await sendPushToUser(transfer.assignedToId, {
+      title: "🔬 Paciente en la sala",
+      body:  `${transfer.patientFullName} · finaliza el traslado cuando termine la prueba`,
+      url:   "/celador",
+    });
+  }
 
   revalidatePath("/tecnico");
   revalidatePath(`/tecnico/transfers/${transferId}`);

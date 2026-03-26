@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
 import { emitTransferEvent } from "@/lib/eventBus";
+import { sendPushToUser } from "@/lib/webpush";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { revalidatePath } from "next/cache";
@@ -63,6 +64,13 @@ export async function assignTransfer(formData: FormData) {
     tecnicoId:  transfer.createdById,
     mrn:        transfer.mrn,
     patientName: transfer.patientFullName,
+  });
+
+  // Push al celador asignado
+  await sendPushToUser(celadorId, {
+    title: "📋 Nuevo traslado asignado",
+    body:  `${transfer.patientFullName} · ${transfer.mrn}`,
+    url:   "/celador",
   });
 
   revalidatePath(`/admin/transfer/${transferId}`);

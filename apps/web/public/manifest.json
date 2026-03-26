@@ -1,0 +1,37 @@
+{
+  "name": "MedFlow",
+  "short_name": "MedFlow",
+  "description": "Gestión de traslados hospitalarios",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9fafb",
+  "theme_color": "#111827",
+  "categories": ["medical", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mis traslados",
+      "url": "/celador",
+      "description": "Ver traslados asignados"
+    },
+    {
+      "name": "Mis solicitudes",
+      "url": "/tecnico",
+      "description": "Ver solicitudes de traslado"
+    }
+  ]
+}

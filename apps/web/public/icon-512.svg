@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#111827"/>
+  <!-- Cruz médica -->
+  <rect x="212" y="100" width="88" height="312" rx="20" fill="white"/>
+  <rect x="100" y="212" width="312" height="88" rx="20" fill="white"/>
+</svg>

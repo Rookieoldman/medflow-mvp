@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/transferEvents";
 import { emitTransferEvent } from "@/lib/eventBus";
+import { sendPushToRole } from "@/lib/webpush";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
@@ -77,6 +78,13 @@ export async function createTransfer(formData: FormData) {
     patientName: patientFullName,
     mrn,
     location,
+  });
+
+  // Push a todos los admins avisando de nuevo traslado
+  await sendPushToRole("ADMIN", {
+    title: "🚑 Nuevo traslado solicitado",
+    body:  `${patientFullName} · ${location}`,
+    url:   "/admin/transfers",
   });
 
   redirect("/tecnico");
