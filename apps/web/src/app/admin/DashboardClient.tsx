@@ -82,42 +82,54 @@ function formatElapsed(createdAt: string, now: number) {
 }
 
 export default function DashboardClient({
-  transfers,
-  total,
-  riskCount: initialRiskCount,
-  slaPercent: initialSla,
-  statusBreakdown,
-  celadores: initialCeladores,
+  transfers:       initialTransfers,
+  total:           initialTotal,
+  riskCount:       initialRiskCount,
+  slaPercent:      initialSla,
+  statusBreakdown: initialBreakdown,
+  celadores:       initialCeladores,
 }: Props) {
-  const [now,       setNow]       = useState(Date.now());
-  const [celadores, setCeladores] = useState<CeladorEntry[]>(initialCeladores);
+  const [now,             setNow]             = useState(Date.now());
+  const [transfers,       setTransfers]       = useState(initialTransfers);
+  const [total,           setTotal]           = useState(initialTotal);
+  const [statusBreakdown, setStatusBreakdown] = useState(initialBreakdown);
+  const [celadores,       setCeladores]       = useState<CeladorEntry[]>(initialCeladores);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchCeladores = async () => {
+  void initialRiskCount;
+  void initialSla;
+
+  const fetchDashboard = async () => {
     try {
-      const res = await fetch("/api/admin/celadores");
-      if (res.ok) setCeladores(await res.json());
+      const res = await fetch("/api/admin/dashboard");
+      if (!res.ok) return;
+      const data = await res.json();
+      setTransfers(data.transfers);
+      setTotal(data.total);
+      setStatusBreakdown(data.statusBreakdown);
+      setCeladores(data.celadores);
+      setNow(Date.now());
     } catch { /* ignorar */ }
   };
 
   useEffect(() => {
-    // Reloj interno cada 10 s (para SLA y countdown)
-    const timer = setInterval(() => setNow(Date.now()), 10_000);
+    // Reloj interno cada 10 s (para SLA countdown)
+    const clock = setInterval(() => setNow(Date.now()), 10_000);
 
-    // Polling celadores cada 30 s
-    pollRef.current = setInterval(fetchCeladores, 30_000);
+    // Polling completo cada 30 s
+    pollRef.current = setInterval(fetchDashboard, 30_000);
 
-    // SSE: refrescar inmediatamente al detectar cambio de descanso
+    // SSE: refrescar inmediatamente en cualquier evento relevante
     const es = new EventSource("/api/events");
     es.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data);
-        if (event.type === "celador:break") fetchCeladores();
+        if (event.type !== "connected") fetchDashboard();
       } catch { /* ignorar */ }
     };
 
     return () => {
-      clearInterval(timer);
+      clearInterval(clock);
       if (pollRef.current) clearInterval(pollRef.current);
       es.close();
     };
@@ -130,11 +142,8 @@ export default function DashboardClient({
   const liveRiskCount = liveRiskList.length;
   const liveSla = total > 0 ? Math.round(((total - liveRiskCount) / total) * 100) : 100;
 
-  const slaColor   = liveSla >= 90 ? "text-green-600" : liveSla >= 75 ? "text-yellow-500" : "text-red-600";
-  const riskColor  = liveRiskCount === 0 ? "text-green-600" : "text-red-600";
-
-  void initialRiskCount;
-  void initialSla;
+  const slaColor  = liveSla >= 90 ? "text-green-600" : liveSla >= 75 ? "text-yellow-500" : "text-red-600";
+  const riskColor = liveRiskCount === 0 ? "text-green-600" : "text-red-600";
 
   return (
     <div className="space-y-5">
@@ -273,7 +282,7 @@ export default function DashboardClient({
       <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden overflow-x-auto">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-800">Traslados activos hoy</h2>
-          <span className="text-xs text-gray-400">Actualización cada 10 s</span>
+          <span className="text-xs text-gray-400">En tiempo real · refresca c/30 s</span>
         </div>
 
         {transfers.length === 0 ? (
