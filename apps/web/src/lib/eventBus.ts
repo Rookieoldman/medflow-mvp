@@ -3,11 +3,12 @@ import { EventEmitter } from "events";
 export type MedflowEventType =
   | "transfer:new"
   | "transfer:assigned"
-  | "transfer:status";
+  | "transfer:status"
+  | "celador:break";
 
 export interface MedflowEvent {
   type:        MedflowEventType;
-  transferId:  string;
+  transferId?: string;
   status?:     string;
   /** ID del celador destinatario (para filtrar en el SSE) */
   celadorId?:  string;

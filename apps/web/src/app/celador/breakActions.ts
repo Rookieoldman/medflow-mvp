@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { breakUsedInCurrentShift, getShift, SHIFT_LABEL } from "@/lib/shifts";
+import { emitTransferEvent } from "@/lib/eventBus";
 
 const BREAK_MINUTES = 20;
 const MIN_AVAILABLE = 2;
@@ -58,6 +59,7 @@ export async function startBreak() {
     data:  { breakUntil, breakUsedAt: now },
   });
 
+  emitTransferEvent({ type: "celador:break", celadorId });
   revalidatePath("/celador");
 }
 
@@ -69,5 +71,6 @@ export async function endBreak() {
     data:  { breakUntil: null },
   });
 
+  emitTransferEvent({ type: "celador:break", celadorId });
   revalidatePath("/celador");
 }

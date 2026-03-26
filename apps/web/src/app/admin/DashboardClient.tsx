@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getSLABadge } from "@/lib/sla";
 
@@ -87,13 +87,40 @@ export default function DashboardClient({
   riskCount: initialRiskCount,
   slaPercent: initialSla,
   statusBreakdown,
-  celadores,
+  celadores: initialCeladores,
 }: Props) {
-  const [now, setNow] = useState(Date.now());
+  const [now,       setNow]       = useState(Date.now());
+  const [celadores, setCeladores] = useState<CeladorEntry[]>(initialCeladores);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchCeladores = async () => {
+    try {
+      const res = await fetch("/api/admin/celadores");
+      if (res.ok) setCeladores(await res.json());
+    } catch { /* ignorar */ }
+  };
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 10000);
-    return () => clearInterval(timer);
+    // Reloj interno cada 10 s (para SLA y countdown)
+    const timer = setInterval(() => setNow(Date.now()), 10_000);
+
+    // Polling celadores cada 30 s
+    pollRef.current = setInterval(fetchCeladores, 30_000);
+
+    // SSE: refrescar inmediatamente al detectar cambio de descanso
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type === "celador:break") fetchCeladores();
+      } catch { /* ignorar */ }
+    };
+
+    return () => {
+      clearInterval(timer);
+      if (pollRef.current) clearInterval(pollRef.current);
+      es.close();
+    };
   }, []);
 
   const liveRiskList = useMemo(
