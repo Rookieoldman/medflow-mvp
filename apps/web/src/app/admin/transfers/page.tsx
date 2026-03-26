@@ -17,48 +17,76 @@ const TEST_LABELS: Record<string, string> = {
   TC:               "TC",
 };
 
+const ACTIVE_STATUSES   = ["SOLICITADO","ASIGNADO","EN_CURSO","EN_PRUEBA","PAUSADO"];
+const INACTIVE_STATUSES = ["FINALIZADO","CANCELADO"];
+
 export default async function AdminTransfersPage({
   searchParams,
 }: {
-  searchParams:
-    | Promise<{
-        role?: string;
-        userId?: string;
-        status?: string;
-        testType?: string;
-        difficulty?: string;
-      }>
-    | {
-        role?: string;
-        userId?: string;
-        status?: string;
-        testType?: string;
-        difficulty?: string;
-      };
+  searchParams: Promise<Record<string, string>> | Record<string, string>;
 }) {
   const sp = await Promise.resolve(searchParams as any);
-  const { role, userId, status, testType, difficulty } = sp ?? {};
+  const { search, tecnicoId, celadorId, status, priority, testType, difficulty, dateRange } = sp ?? {};
 
+  /* ── WHERE clause ── */
   const where: any = {};
-  if (status)     where.status     = status;
+
+  // Búsqueda libre por nombre de paciente o MRN
+  if (search?.trim()) {
+    where.OR = [
+      { patientFullName: { contains: search.trim(), mode: "insensitive" } },
+      { mrn:             { contains: search.trim(), mode: "insensitive" } },
+    ];
+  }
+
+  // Estado — soporta grupos rápidos __ACTIVE__ / __INACTIVE__
+  if (status === "__ACTIVE__") {
+    where.status = { in: ACTIVE_STATUSES };
+  } else if (status === "__INACTIVE__") {
+    where.status = { in: INACTIVE_STATUSES };
+  } else if (status) {
+    where.status = status;
+  }
+
+  if (priority)   where.priority   = priority;
   if (testType)   where.testType   = testType;
   if (difficulty) where.difficulty = difficulty;
+  if (tecnicoId)  where.createdById  = tecnicoId;
+  if (celadorId)  where.assignedToId = celadorId;
 
-  if (role === "TECNICO" && userId) where.createdById  = userId;
-  if (role === "CELADOR" && userId) where.assignedToId = userId;
+  // Rango de fechas
+  if (dateRange) {
+    const now   = new Date();
+    const start = new Date(now);
+    if (dateRange === "today") {
+      start.setHours(0, 0, 0, 0);
+    } else if (dateRange === "week") {
+      start.setDate(start.getDate() - 7);
+    } else if (dateRange === "month") {
+      start.setDate(start.getDate() - 30);
+    }
+    if (dateRange !== "") where.createdAt = { gte: start };
+  }
 
   const [transfers, users] = await Promise.all([
     prisma.transfer.findMany({
       where,
       include: { createdBy: true, assignedTo: true },
-      orderBy: [{ difficulty: "desc" }, { priority: "desc" }, { createdAt: "desc" }],
-      take: 100,
+      orderBy: [{ priority: "desc" }, { difficulty: "desc" }, { createdAt: "desc" }],
+      take: 200,
     }),
     prisma.user.findMany({
-      where: role ? { role: role as any } : undefined,
-      orderBy: { email: "asc" },
+      where:   { role: { in: ["TECNICO", "CELADOR"] }, active: true },
+      orderBy: { firstName: "asc" },
+      select:  { id: true, firstName: true, lastName1: true, email: true, role: true },
     }),
   ]);
+
+  const filterUsers = users.map((u) => ({
+    id:   u.id,
+    role: u.role,
+    name: [u.firstName, u.lastName1].filter(Boolean).join(" ") || u.email,
+  }));
 
   return (
     <section className="space-y-5">
@@ -67,7 +95,7 @@ export default async function AdminTransfersPage({
         subtitle={`${transfers.length} resultado${transfers.length !== 1 ? "s" : ""}`}
       />
 
-      <AdminFilters users={users} />
+      <AdminFilters users={filterUsers} />
 
       {transfers.length === 0 ? (
         <EmptyState
@@ -100,7 +128,9 @@ export default async function AdminTransfersPage({
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 truncate max-w-[160px] sm:max-w-none">{t.patientFullName}</div>
+                      <div className="font-medium text-gray-900 truncate max-w-[160px] sm:max-w-none">
+                        {t.patientFullName}
+                      </div>
                       <div className="text-xs text-gray-400 font-mono">{t.mrn}</div>
                     </td>
                     <td className="px-4 py-3">

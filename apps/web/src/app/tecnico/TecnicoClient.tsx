@@ -219,12 +219,70 @@ export default function TecnicoClient() {
     );
   }
 
-  /* Separar por grupo de acción: solo EN_CURSO requiere acción del técnico */
-  const needsAction = transfers.filter((t) => t.status === "EN_CURSO");
-  const waiting     = transfers.filter((t) => t.status !== "EN_CURSO");
+  /* ── Filtros cliente ── */
+  const [search,       setSearch]       = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const filtered = transfers.filter((t) => {
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!t.patientFullName.toLowerCase().includes(q) && !t.mrn.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const needsAction = filtered.filter((t) => t.status === "EN_CURSO");
+  const waiting     = filtered.filter((t) => t.status !== "EN_CURSO");
+
+  const STATUS_OPTS = [
+    { value: "SOLICITADO", label: "Solicitado" },
+    { value: "ASIGNADO",   label: "Asignado"   },
+    { value: "EN_CURSO",   label: "En curso"   },
+    { value: "EN_PRUEBA",  label: "En prueba"  },
+    { value: "PAUSADO",    label: "Pausado"    },
+    { value: "FINALIZADO", label: "Finalizado" },
+    { value: "CANCELADO",  label: "Cancelado"  },
+  ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* ── Barra de filtros ── */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+          <input
+            type="text"
+            placeholder="Paciente o nº historia…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-gray-200"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+        >
+          <option value="">Todos los estados</option>
+          {STATUS_OPTS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {(search || statusFilter) && (
+          <button
+            onClick={() => { setSearch(""); setStatusFilter(""); }}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 && transfers.length > 0 && (
+        <EmptyState title="Sin resultados" subtitle="Prueba con otros filtros" icon="🔍" />
+      )}
+
       {/* Requieren atención del técnico */}
       {needsAction.length > 0 && (
         <div className="space-y-3">
@@ -250,7 +308,7 @@ export default function TecnicoClient() {
         </div>
       )}
 
-      <p className="text-xs text-gray-300 text-right">Actualiza cada 10 s</p>
+      <p className="text-xs text-gray-300 text-right">Actualiza cada 15 s</p>
     </div>
   );
 }

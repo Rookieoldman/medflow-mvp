@@ -82,6 +82,153 @@ const STATUS_CTX: Record<string, string> = {
 
 const BTN = "border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
 
+/* ── Sección "Disponibles" con filtros ── */
+function AvailableSection({
+  available,
+  pendingId,
+  onBreak,
+  onAssign,
+}: {
+  available: Transfer[];
+  pendingId: string | null;
+  onBreak:   boolean;
+  onAssign:  (id: string) => void;
+}) {
+  const [search,      setSearch]      = useState("");
+  const [difficulty,  setDifficulty]  = useState("");
+  const [priority,    setPriority]    = useState("");
+
+  const filtered = available.filter((t) => {
+    if (difficulty && t.difficulty !== difficulty) return false;
+    if (priority   && t.priority   !== priority)   return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (
+        !t.location.toLowerCase().includes(q) &&
+        !t.patientFullName.toLowerCase().includes(q) &&
+        !t.mrn.toLowerCase().includes(q)
+      ) return false;
+    }
+    return true;
+  });
+
+  const hasFilters = search || difficulty || priority;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-base font-semibold text-gray-900">
+          Disponibles
+          {available.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-gray-400">· {filtered.length}{hasFilters ? `/${available.length}` : ""}</span>
+          )}
+        </h2>
+      </div>
+
+      {/* Filtros */}
+      {available.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[160px]">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+            <input
+              type="text"
+              placeholder="Ubicación o paciente…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-gray-200 bg-white"
+            />
+          </div>
+          <select
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+          >
+            <option value="">Dificultad</option>
+            <option value="CRITICO">🔴 Crítico</option>
+            <option value="MODERADO">🟡 Moderado</option>
+            <option value="BANAL">🟢 Banal</option>
+          </select>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+          >
+            <option value="">Prioridad</option>
+            <option value="URGENTE">🔴 Urgente</option>
+            <option value="NORMAL">⚪ Normal</option>
+          </select>
+          {hasFilters && (
+            <button
+              onClick={() => { setSearch(""); setDifficulty(""); setPriority(""); }}
+              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+      )}
+
+      {available.length === 0 ? (
+        <EmptyState title="Sin solicitudes disponibles" subtitle="Se actualizará automáticamente" icon="⏳" />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="Sin resultados" subtitle="Prueba con otros filtros" icon="🔍" />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {filtered.map((t) => (
+            <div
+              key={t.id}
+              className={`border-l-4 ${DIFFICULTY_BORDER[t.difficulty] ?? "border-l-gray-300"} border border-gray-200 rounded-xl bg-white shadow-sm flex flex-col`}
+            >
+              {/* Cuerpo de la tarjeta */}
+              <div className="p-4 flex-1 space-y-3">
+                {/* Fila superior */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs text-gray-400">{t.mrn}</span>
+                  <ElapsedTime createdAt={t.createdAt} />
+                </div>
+
+                {/* Ubicación */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Origen</p>
+                  <p className="font-semibold text-gray-900 text-sm sm:text-base">{t.location}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Prueba: {TEST_LABELS[t.testType] ?? t.testType}
+                  </p>
+                </div>
+
+                {/* Paciente (anonimizado) */}
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
+                    {t.patientFullName.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}
+                  </div>
+                  <p className="text-sm text-gray-700 font-medium truncate">{t.patientFullName}</p>
+                </div>
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-1.5">
+                  <DifficultyBadge difficulty={t.difficulty} />
+                  <PriorityBadge   priority={t.priority} />
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+                <button
+                  disabled={!!pendingId || onBreak}
+                  onClick={() => onAssign(t.id)}
+                  className="w-full bg-gray-900 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                >
+                  {onBreak ? "☕ En descanso" : pendingId === t.id ? "Asignando…" : "Asignarme este traslado"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function CeladorClient() {
   const [available,  setAvailable]  = useState<Transfer[]>([]);
   const [mine,       setMine]       = useState<Transfer[]>([]);
@@ -222,70 +369,12 @@ export default function CeladorClient() {
       {/* ════════════════════════════════════════
           DISPONIBLES — tarjetas tipo "solicitud"
       ════════════════════════════════════════ */}
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-gray-900">
-          Disponibles
-          {available.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-gray-400">· {available.length}</span>
-          )}
-        </h2>
-
-        {available.length === 0 ? (
-          <EmptyState title="Sin solicitudes disponibles" subtitle="Se actualizará automáticamente" icon="⏳" />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {available.map((t) => (
-              <div
-                key={t.id}
-                className={`border-l-4 ${DIFFICULTY_BORDER[t.difficulty] ?? "border-l-gray-300"} border border-gray-200 rounded-xl bg-white shadow-sm flex flex-col`}
-              >
-                {/* Cuerpo de la tarjeta */}
-                <div className="p-4 flex-1 space-y-3">
-                  {/* Fila superior */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-gray-400">{t.mrn}</span>
-                    <ElapsedTime createdAt={t.createdAt} />
-                  </div>
-
-                  {/* Ubicación — lo más importante para el celador */}
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Origen</p>
-                    <p className="font-semibold text-gray-900 text-sm sm:text-base">{t.location}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Prueba: {TEST_LABELS[t.testType] ?? t.testType}
-                    </p>
-                  </div>
-
-                  {/* Paciente (anonimizado) */}
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
-                      {t.patientFullName.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
-                    </div>
-                    <p className="text-sm text-gray-700 font-medium truncate">{t.patientFullName}</p>
-                  </div>
-
-                  {/* Badges */}
-                  <div className="flex flex-wrap gap-1.5">
-                    <DifficultyBadge difficulty={t.difficulty} />
-                    <PriorityBadge   priority={t.priority} />
-                  </div>
-                </div>
-
-                {/* CTA */}
-                <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl">
-                  <button
-                    disabled={!!pendingId || onBreak}
-                    onClick={() => run(t.id, assignToMe)}
-                    className="w-full bg-gray-900 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-gray-700 disabled:opacity-40 transition-colors"
-                  >
-                    {onBreak ? "☕ En descanso" : pendingId === t.id ? "Asignando…" : "Asignarme este traslado"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <AvailableSection
+        available={available}
+        pendingId={pendingId}
+        onBreak={onBreak}
+        onAssign={(id) => run(id, assignToMe)}
+      />
 
       {/* ════════════════════════════════════════
           MIS TRASLADOS — acciones de transporte
