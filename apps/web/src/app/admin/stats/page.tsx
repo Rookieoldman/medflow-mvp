@@ -14,6 +14,11 @@ import {
   type StatsPeriodKey,
   type StatsScopeKey,
 } from "@/lib/adminStatsPeriod";
+import {
+  exploreUrl,
+  periodScopeToExploreDefaults,
+  type ExploreKpi,
+} from "@/lib/statsExplore";
 import ChartsClient from "./ChartsClient";
 import StatsPeriodFilters from "./StatsPeriodFilters";
 
@@ -78,6 +83,16 @@ export default async function StatsPage({
   const whereActive  = whereActiveSnapshot(scopeKey);
   const whereFin     = whereFinalizedInPeriod(pStart, scopeKey);
   const whereCan     = whereCancelledInPeriod(pStart, scopeKey);
+
+  const exploreDefaults = periodScopeToExploreDefaults(periodKey);
+  const exploreCtx      = {
+    from:  exploreDefaults.from,
+    to:    exploreDefaults.to,
+    scope: scopeKey,
+  };
+
+  const kpiHref = (kpi: ExploreKpi) =>
+    exploreUrl({ view: "kpi", kpi, ...exploreCtx });
 
   /* ── PER-TAB FETCHING ── */
 
@@ -315,10 +330,27 @@ export default async function StatsPage({
 
       <StatsPeriodFilters period={periodKey} scope={scopeKey} activeTab={tab} />
 
+      <p className="text-sm text-gray-600">
+        <Link
+          href={exploreUrl({ view: "breakdown", dim: "status", ...exploreCtx })}
+          className="font-medium text-gray-900 underline underline-offset-2 hover:text-gray-600"
+        >
+          Abrir explorador avanzado
+        </Link>
+        {" · "}
+        filtros por año/mes/día y comparación entre períodos.
+      </p>
+
       {/* CONTENT */}
-      {tab === "global"  && global  && <GlobalTab  data={global}  />}
-      {tab === "tecnico" && tecnico && <TecnicoTab data={tecnico} />}
-      {tab === "celador" && celador && <CeladorTab data={celador} />}
+      {tab === "global"  && global  && (
+        <GlobalTab data={global} explore={exploreCtx} kpiHref={kpiHref} />
+      )}
+      {tab === "tecnico" && tecnico && (
+        <TecnicoTab data={tecnico} explore={exploreCtx} />
+      )}
+      {tab === "celador" && celador && (
+        <CeladorTab data={celador} explore={exploreCtx} />
+      )}
     </main>
   );
 }
@@ -363,10 +395,33 @@ type GlobalData = {
   completionVsCreated:  number;
 };
 
-function GlobalTab({ data }: { data: GlobalData }) {
-  const chartStatusData   = data.byStatus.map((s) => ({ name: STATUS_LABELS[s.status]   ?? s.status,   value: s._count }));
-  const chartTestTypeData = data.byTestType.map((t) => ({ name: TEST_LABELS[t.testType] ?? t.testType, value: t._count }));
-  const chartPriorityData = data.byPriority.map((p) => ({ name: p.priority === "URGENTE" ? "Urgente" : "Normal", value: p._count }));
+function GlobalTab({
+  data,
+  explore,
+  kpiHref,
+}: {
+  data: GlobalData;
+  explore: { from: string; to: string; scope: StatsScopeKey };
+  kpiHref: (k: ExploreKpi) => string;
+}) {
+  const slice = (dim: "status" | "testType" | "priority" | "difficulty" | "scope", val: string) =>
+    exploreUrl({ view: "slice", dim, val, ...explore });
+
+  const chartStatusData = data.byStatus.map((s) => ({
+    name:   STATUS_LABELS[s.status] ?? s.status,
+    value:  s._count,
+    rawVal: s.status,
+  }));
+  const chartTestTypeData = data.byTestType.map((t) => ({
+    name:   TEST_LABELS[t.testType] ?? t.testType,
+    value:  t._count,
+    rawVal: t.testType,
+  }));
+  const chartPriorityData = data.byPriority.map((p) => ({
+    name:   p.priority === "URGENTE" ? "Urgente" : "Normal",
+    value:  p._count,
+    rawVal: p.priority,
+  }));
 
   const maxStatus =
     data.byStatus.length > 0 ? Math.max(...data.byStatus.map((s) => s._count), 1) : 1;
@@ -384,23 +439,31 @@ function GlobalTab({ data }: { data: GlobalData }) {
     <div className="space-y-6">
       {/* KPIs */}
       <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-        <Kpi label="Creados (período)"     value={data.createdInPeriod} />
-        <Kpi label="Activos ahora"         value={data.activeNow} />
-        <Kpi label="Urgentes activos"      value={data.urgentActive} />
-        <Kpi label="Urgentes (en período)" value={data.urgentInPeriod} />
-        <Kpi label="Creados hoy"           value={data.createdToday} />
-        <Kpi label="Incidencias (período)" value={data.incidentsInPeriod} />
-        <Kpi label="Finalizados (período)" value={data.finishedInPeriod} />
-        <Kpi label="Cancelados (período)"  value={data.cancelledInPeriod} />
+        <Kpi label="Creados (período)"     value={data.createdInPeriod} href={kpiHref("created")} />
+        <Kpi label="Activos ahora"         value={data.activeNow}         href={kpiHref("active_now")} />
+        <Kpi label="Urgentes activos"      value={data.urgentActive}      href={kpiHref("urgent_active")} />
+        <Kpi label="Urgentes (en período)" value={data.urgentInPeriod}    href={kpiHref("urgent_period")} />
+        <Kpi label="Creados hoy"           value={data.createdToday}     href={kpiHref("today_created")} />
+        <Kpi label="Incidencias (período)" value={data.incidentsInPeriod} href={kpiHref("incidents")} />
+        <Kpi label="Finalizados (período)" value={data.finishedInPeriod}  href={kpiHref("finished")} />
+        <Kpi label="Cancelados (período)"  value={data.cancelledInPeriod} href={kpiHref("cancelled")} />
         <Kpi
           label="T. medio cierre"
           value={data.finishedInPeriod > 0 ? `${data.avgTime} min` : "—"}
+          href={
+            data.finishedInPeriod > 0
+              ? kpiHref("finished")
+              : undefined
+          }
         />
       </section>
 
       {/* Tasas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <section className="border rounded-xl p-5 bg-white space-y-3">
+        <Link
+          href={exploreUrl({ view: "breakdown", dim: "status", ...explore })}
+          className="block border rounded-xl p-5 bg-white space-y-3 hover:ring-2 hover:ring-gray-200 transition-shadow"
+        >
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-700">
               Éxito entre cerrados en período
@@ -412,7 +475,7 @@ function GlobalTab({ data }: { data: GlobalData }) {
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Finalizados / (finalizados + cancelados) según fecha de cierre en el período.
+            Finalizados / (finalizados + cancelados) según fecha de cierre. Clic para desglose por estado.
           </p>
           <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
             <div
@@ -420,8 +483,11 @@ function GlobalTab({ data }: { data: GlobalData }) {
               style={{ width: `${data.successAmongClosed}%` }}
             />
           </div>
-        </section>
-        <section className="border rounded-xl p-5 bg-white space-y-3">
+        </Link>
+        <Link
+          href={exploreUrl({ view: "breakdown", dim: "difficulty", ...explore })}
+          className="block border rounded-xl p-5 bg-white space-y-3 hover:ring-2 hover:ring-gray-200 transition-shadow"
+        >
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-700">
               Finalizados / creados en período
@@ -431,7 +497,7 @@ function GlobalTab({ data }: { data: GlobalData }) {
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Indicador orientativo: muchos creados al final del período pueden seguir abiertos.
+            Clic para desglose por dificultad y comparar en el explorador.
           </p>
           <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
             <div
@@ -439,14 +505,19 @@ function GlobalTab({ data }: { data: GlobalData }) {
               style={{ width: `${data.completionVsCreated}%` }}
             />
           </div>
-        </section>
+        </Link>
       </div>
 
       {/* DIFFICULTY + STATUS breakdown — 2 cols */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* DIFICULTAD */}
         <section className="border rounded-xl p-5 bg-white space-y-4">
-          <h2 className="font-semibold text-gray-800">Dificultad de traslados</h2>
+          <Link
+            href={exploreUrl({ view: "breakdown", dim: "difficulty", ...explore })}
+            className="font-semibold text-gray-800 hover:underline inline-block"
+          >
+            Dificultad de traslados →
+          </Link>
 
           {/* Barra horizontal proporcional */}
           <div className="flex h-5 rounded-full overflow-hidden gap-0.5">
@@ -462,7 +533,11 @@ function GlobalTab({ data }: { data: GlobalData }) {
 
           <div className="space-y-2">
             {byDiffSorted.map((d) => (
-              <div key={d.difficulty} className="space-y-0.5">
+              <Link
+                key={d.difficulty}
+                href={slice("difficulty", d.difficulty)}
+                className="block space-y-0.5 rounded-lg hover:bg-gray-50 -mx-1 px-1 py-0.5"
+              >
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full inline-block ${DIFFICULTY_COLORS[d.difficulty] ?? "bg-gray-300"}`} />
@@ -481,19 +556,28 @@ function GlobalTab({ data }: { data: GlobalData }) {
                     style={{ width: `${Math.round((d._count / maxDifficulty) * 100)}%` }}
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
 
         {/* ESTADO */}
         <section className="border rounded-xl p-5 bg-white space-y-3">
-          <h2 className="font-semibold text-gray-800">Distribución por estado</h2>
+          <Link
+            href={exploreUrl({ view: "breakdown", dim: "status", ...explore })}
+            className="font-semibold text-gray-800 hover:underline inline-block"
+          >
+            Distribución por estado →
+          </Link>
           <div className="space-y-2">
             {data.byStatus
               .sort((a, b) => b._count - a._count)
               .map((s) => (
-                <div key={s.status} className="space-y-0.5">
+                <Link
+                  key={s.status}
+                  href={slice("status", s.status)}
+                  className="block space-y-0.5 rounded-lg hover:bg-gray-50 -mx-1 px-1 py-0.5"
+                >
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">{STATUS_LABELS[s.status] ?? s.status}</span>
                     <span className="font-medium text-gray-900">{s._count}</span>
@@ -504,7 +588,7 @@ function GlobalTab({ data }: { data: GlobalData }) {
                       style={{ width: `${Math.round((s._count / maxStatus) * 100)}%` }}
                     />
                   </div>
-                </div>
+                </Link>
               ))}
           </div>
         </section>
@@ -529,11 +613,15 @@ function GlobalTab({ data }: { data: GlobalData }) {
           </div>
           <div className="flex flex-wrap gap-4 text-sm">
             {data.byScope.map((s) => (
-              <span key={s.scope} className="text-gray-700">
+              <Link
+                key={s.scope}
+                href={slice("scope", s.scope)}
+                className="text-gray-700 hover:text-gray-900 underline-offset-2 hover:underline"
+              >
                 <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${s.scope === "URGENCIAS" ? "bg-rose-500" : "bg-sky-500"}`} />
                 {SCOPE_CHART_LABELS[s.scope] ?? s.scope}: <strong>{s._count}</strong> (
                 {Math.round((s._count / totalScope) * 100)}%)
-              </span>
+              </Link>
             ))}
           </div>
         </section>
@@ -544,6 +632,7 @@ function GlobalTab({ data }: { data: GlobalData }) {
         byStatus={chartStatusData}
         byTestType={chartTestTypeData}
         byPriority={chartPriorityData}
+        explore={explore}
         preFormatted
       />
     </div>
@@ -567,19 +656,50 @@ type TecnicoData = {
   activeTecs:   number;
 };
 
-function TecnicoTab({ data }: { data: TecnicoData }) {
+function TecnicoTab({
+  data,
+  explore,
+}: {
+  data: TecnicoData;
+  explore: { from: string; to: string; scope: StatsScopeKey };
+}) {
   return (
     <div className="space-y-6">
       <p className="text-xs text-gray-500 border border-dashed border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
         Las cifras y el ranking usan solo traslados <strong>creados</strong> en el período y ámbito
-        seleccionados arriba.
+        seleccionados arriba.{" "}
+        <Link
+          href={exploreUrl({ view: "breakdown", dim: "testType", ...explore })}
+          className="text-gray-800 font-medium underline"
+        >
+          Explorar por tipo de prueba
+        </Link>
+        {" · "}
+        <Link
+          href={exploreUrl({ view: "kpi", kpi: "created", ...explore })}
+          className="text-gray-800 font-medium underline"
+        >
+          Listado de creados
+        </Link>
       </p>
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Técnicos activos" value={data.activeTecs}   />
-        <Kpi label="Solicitudes"      value={data.totalCreated} />
-        <Kpi label="Urgentes"         value={data.totalUrgent}  />
-        <Kpi label="En curso"         value={data.totalActive}  />
+        <Kpi label="Técnicos activos" value={data.activeTecs} />
+        <Kpi
+          label="Solicitudes"
+          value={data.totalCreated}
+          href={exploreUrl({ view: "kpi", kpi: "created", ...explore })}
+        />
+        <Kpi
+          label="Urgentes"
+          value={data.totalUrgent}
+          href={exploreUrl({ view: "kpi", kpi: "urgent_period", ...explore })}
+        />
+        <Kpi
+          label="En curso"
+          value={data.totalActive}
+          href={exploreUrl({ view: "kpi", kpi: "active_now", ...explore })}
+        />
       </section>
 
       {/* RANKING */}
@@ -673,19 +793,50 @@ type CeladorData = {
   globalAvgTime:  number;
 };
 
-function CeladorTab({ data }: { data: CeladorData }) {
+function CeladorTab({
+  data,
+  explore,
+}: {
+  data: CeladorData;
+  explore: { from: string; to: string; scope: StatsScopeKey };
+}) {
   return (
     <div className="space-y-6">
       <p className="text-xs text-gray-500 border border-dashed border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
         El ranking usa traslados <strong>creados</strong> en el período y ámbito seleccionados (asignaciones
-        ligadas a esas solicitudes).
+        ligadas a esas solicitudes).{" "}
+        <Link
+          href={exploreUrl({ view: "kpi", kpi: "finished", ...explore })}
+          className="text-gray-800 font-medium underline"
+        >
+          Ver finalizados en explorador
+        </Link>
+        {" · "}
+        <Link
+          href={exploreUrl({ view: "breakdown", dim: "difficulty", ...explore })}
+          className="text-gray-800 font-medium underline"
+        >
+          Por dificultad
+        </Link>
       </p>
       {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Celadores activos" value={data.activeCeladors}         />
-        <Kpi label="Finalizados"       value={data.totalFinished}          />
-        <Kpi label="Urgentes"          value={data.totalUrgent}            />
-        <Kpi label="T. medio global"   value={`${data.globalAvgTime} min`} />
+        <Kpi label="Celadores activos" value={data.activeCeladors} />
+        <Kpi
+          label="Finalizados"
+          value={data.totalFinished}
+          href={exploreUrl({ view: "kpi", kpi: "finished", ...explore })}
+        />
+        <Kpi
+          label="Urgentes"
+          value={data.totalUrgent}
+          href={exploreUrl({ view: "kpi", kpi: "urgent_period", ...explore })}
+        />
+        <Kpi
+          label="T. medio global"
+          value={`${data.globalAvgTime} min`}
+          href={exploreUrl({ view: "kpi", kpi: "finished", ...explore })}
+        />
       </section>
 
       {/* RANKING */}
@@ -770,11 +921,33 @@ function CeladorTab({ data }: { data: CeladorData }) {
 /* ================================================================
    KPI COMPONENT
 ================================================================ */
-function Kpi({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="border rounded-xl p-4 bg-white space-y-1">
+function Kpi({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: string | number;
+  href?: string;
+}) {
+  const inner = (
+    <>
       <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
       <div className="text-2xl font-semibold text-gray-900">{value}</div>
-    </div>
+      {href && (
+        <div className="text-[10px] text-gray-400 pt-1">Clic para ampliar</div>
+      )}
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block border rounded-xl p-4 bg-white space-y-1 hover:ring-2 hover:ring-gray-300 transition-shadow cursor-pointer"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="border rounded-xl p-4 bg-white space-y-1">{inner}</div>;
 }
