@@ -21,8 +21,16 @@ export async function createIncident(formData: FormData) {
   const t = await prisma.transfer.findUnique({ where: { id: transferId } });
   if (!t) throw new Error("Traslado no encontrado");
 
-  if (t.assignedToId && t.assignedToId !== celadorId) {
-    throw new Error("No puedes registrar incidencias en un traslado de otro celador");
+  if (t.assignedToId !== celadorId) {
+    throw new Error(
+      t.assignedToId
+        ? "No puedes registrar incidencias en un traslado de otro celador"
+        : "Debes tener el traslado asignado para registrar una incidencia"
+    );
+  }
+
+  if (t.status === "FINALIZADO" || t.status === "CANCELADO") {
+    throw new Error("No se pueden registrar incidencias en un traslado cerrado");
   }
 
   await prisma.incident.create({

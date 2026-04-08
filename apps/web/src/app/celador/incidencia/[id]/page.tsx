@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { fDate } from "@/lib/format";
+import { celadorMayViewTransferDetail } from "@/lib/celadorTransferAccess";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,9 +30,15 @@ export default async function IncidenciaPage({
   const transfer = await prisma.transfer.findUnique({ where: { id } });
   if (!transfer) return <main className="p-6">Traslado no encontrado</main>;
 
-  if (transfer.assignedToId && transfer.assignedToId !== session.user.id) {
+  if (!celadorMayViewTransferDetail(transfer, session.user.id)) {
     redirect("/celador");
   }
+
+  /* Solo el celador asignado puede registrar incidencias (no en cola sin asignar). */
+  if (transfer.assignedToId !== session.user.id) {
+    redirect(`/celador/transfer/${id}`);
+  }
+
   if (transfer.status === "FINALIZADO" || transfer.status === "CANCELADO") {
     redirect(`/celador/transfer/${id}`);
   }

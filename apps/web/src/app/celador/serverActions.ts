@@ -260,6 +260,10 @@ export async function pauseTransfer(formData: FormData) {
 
   if (transfer.status === "PAUSADO") return;
 
+  if (transfer.status !== "EN_CURSO") {
+    throw new Error("Solo se puede pausar un traslado en curso");
+  }
+
   await prisma.transfer.update({
     where: { id: transferId },
     data: { previousStatus: transfer.status, status: "PAUSADO" },
@@ -346,7 +350,18 @@ export async function acceptTransfer(formData: FormData) {
 
   await recordEvent(transferId, celadorId, "EN_CURSO", "ASIGNADO", `Firmado por: ${signerName}`);
 
+  emitTransferEvent({
+    type:        "transfer:status",
+    transferId,
+    status:      "EN_CURSO",
+    celadorId,
+    tecnicoId:   transfer.createdById,
+    mrn:         transfer.mrn,
+    patientName: transfer.patientFullName,
+  });
+
   revalidatePath("/celador");
+  revalidatePath(`/celador/transfer/${transferId}`);
 }
 
 /* ── Descanso y turno (mismo módulo que el resto de acciones: evita IDs rotos con Turbopack) ── */

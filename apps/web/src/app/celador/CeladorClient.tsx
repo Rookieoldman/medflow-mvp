@@ -272,6 +272,8 @@ export default function CeladorClient() {
   const [breakPending,   startBreakTransition] = useTransition();
   const [shiftPending,   startShiftTransition] = useTransition();
   const breakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingIdRef = useRef<string | null>(null);
+  pendingIdRef.current = pendingId;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -284,10 +286,11 @@ export default function CeladorClient() {
       setBreakUntil(data.breakUntil ?? null);
       setBreakAvailable(data.breakAvailable ?? true);
       setCurrentShift(data.currentShift ?? null);
-      if (pendingId) {
+      const pid = pendingIdRef.current;
+      if (pid) {
         const exists =
-          data.available?.some((t: Transfer) => t.id === pendingId) ||
-          data.mine?.some((t: Transfer) => t.id === pendingId);
+          data.available?.some((t: Transfer) => t.id === pid) ||
+          data.mine?.some((t: Transfer) => t.id === pid);
         if (!exists) setPendingId(null);
       }
     };
@@ -309,7 +312,7 @@ export default function CeladorClient() {
       clearInterval(poll);
       es.close();
     };
-  }, [pendingId]);
+  }, []);
 
   const run = async (
     id: string,
@@ -321,8 +324,13 @@ export default function CeladorClient() {
     const fd = new FormData();
     fd.set("transferId", id);
     extra?.(fd);
-    try { await action(fd); } catch (e) { console.error(e); setPendingId(null); }
-    setTimeout(() => setPendingId(null), 2000);
+    try {
+      await action(fd);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPendingId(null);
+    }
   };
 
   function handleBreakToggle() {

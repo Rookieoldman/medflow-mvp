@@ -10,6 +10,7 @@ import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { TransferTimeline } from "@/components/TransferTimeline";
 import { fDate, fDateTime } from "@/lib/format";
 import { ReleaseToPoolButton } from "@/app/celador/ReleaseToPoolButton";
+import { celadorMayViewTransferDetail } from "@/lib/celadorTransferAccess";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -46,7 +47,7 @@ export default async function CeladorTransferDetail({
 
   if (!transfer) return <main className="p-6">Traslado no encontrado.</main>;
 
-  if (transfer.assignedToId && transfer.assignedToId !== session.user.id) {
+  if (!celadorMayViewTransferDetail(transfer, session.user.id)) {
     redirect("/celador");
   }
 
