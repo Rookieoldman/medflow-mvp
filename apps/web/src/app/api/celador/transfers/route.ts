@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import { initialsFromPatientFullName } from "@/lib/patientInitials";
 import { getShift, breakUsedInCurrentShift } from "@/lib/shifts";
+
+function toCeladorCardRow<T extends { patientFullName: string }>(
+  row: T
+): Omit<T, "patientFullName"> & { patientInitials: string } {
+  const { patientFullName, ...rest } = row;
+  return { ...rest, patientInitials: initialsFromPatientFullName(patientFullName) };
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -27,14 +35,18 @@ export async function GET() {
   const currentShift   = (celador?.activeShift ?? getShift(now)) as string;
 
   /* ===========================
-     TRASLADOS DISPONIBLES
-     - NO asignados
-     - SOLO solicitados
+     TRASLADOS DISPONIBLES (cola)
+     - Sin celador asignado
+     - SOLICITADO (nuevo) o estados operativos huérfanos (p. ej. celador dado de baja
+       con ON DELETE SET NULL): ASIGNADO / EN_CURSO / PAUSADO
+     - No EN_PRUEBA (paciente en sala sin responsable → coordinación admin/técnico)
   ============================ */
   const available = await prisma.transfer.findMany({
     where: {
       assignedToId: null,
-      status: "SOLICITADO",
+      status: {
+        in: ["SOLICITADO", "ASIGNADO", "EN_CURSO", "PAUSADO"],
+      },
     },
     orderBy: [
       { priority: "desc" },
@@ -85,8 +97,8 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    available,
-    mine,
+    available: available.map(toCeladorCardRow),
+    mine:      mine.map(toCeladorCardRow),
     onBreak,
     breakUntil,
     breakAvailable,

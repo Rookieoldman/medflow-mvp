@@ -9,6 +9,7 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { TransferTimeline } from "@/components/TransferTimeline";
 import { fDate, fDateTime } from "@/lib/format";
+import { ReleaseToPoolButton } from "@/app/celador/ReleaseToPoolButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -51,6 +52,10 @@ export default async function CeladorTransferDetail({
 
   const isAssigned = transfer.assignedToId === session.user.id;
   const isFinal    = ["FINALIZADO", "CANCELADO"].includes(transfer.status);
+  const canReleaseToPool =
+    isAssigned &&
+    !isFinal &&
+    ["ASIGNADO", "EN_CURSO", "PAUSADO"].includes(transfer.status);
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
@@ -89,14 +94,17 @@ export default async function CeladorTransferDetail({
         </dl>
       </Card>
 
-      {/* ACCIÓN — registrar incidencia */}
+      {/* ACCIONES */}
       {isAssigned && !isFinal && (
-        <Link
-          href={`/celador/incidencia/${transfer.id}`}
-          className="inline-flex items-center gap-2 border rounded-lg px-4 py-2.5 text-sm font-medium text-orange-700 border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors"
-        >
-          ⚠ Registrar incidencia
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link
+            href={`/celador/incidencia/${transfer.id}`}
+            className="inline-flex items-center gap-2 border rounded-lg px-4 py-2.5 text-sm font-medium text-orange-700 border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors"
+          >
+            ⚠ Registrar incidencia
+          </Link>
+          {canReleaseToPool && <ReleaseToPoolButton transferId={transfer.id} />}
+        </div>
       )}
 
       {/* HISTORIAL */}

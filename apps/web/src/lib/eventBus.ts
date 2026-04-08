@@ -3,6 +3,7 @@ import { EventEmitter } from "events";
 export type MedflowEventType =
   | "transfer:new"
   | "transfer:assigned"
+  | "transfer:released"
   | "transfer:status"
   | "celador:break";
 

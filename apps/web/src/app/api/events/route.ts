@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
         // Filtrar: solo enviar eventos relevantes para este usuario
         const isAdmin   = role === "ADMIN";
         const isCelador = role === "CELADOR" && (
-          event.celadorId === userId || event.type === "transfer:new"
+          event.celadorId === userId ||
+          event.type === "transfer:new" ||
+          event.type === "transfer:released"
         );
         const isTecnico = role === "TECNICO" && event.tecnicoId === userId;
 

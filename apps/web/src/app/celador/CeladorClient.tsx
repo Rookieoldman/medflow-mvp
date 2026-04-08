@@ -12,6 +12,7 @@ import {
   startBreak,
   endBreak,
   setOwnShift,
+  releaseTransferToPool,
 } from "./serverActions";
 
 import SignatureModal  from "@/components/SignatureModal";
@@ -43,7 +44,7 @@ function BreakCountdown({ breakUntil }: { breakUntil: string }) {
 type Transfer = {
   id:                string;
   mrn:               string;
-  patientFullName:   string;
+  patientInitials:   string;
   location:          string;
   testType:          string;
   priority:          string;
@@ -107,7 +108,6 @@ function AvailableSection({
       const q = search.toLowerCase();
       if (
         !t.location.toLowerCase().includes(q) &&
-        !t.patientFullName.toLowerCase().includes(q) &&
         !t.mrn.toLowerCase().includes(q)
       ) return false;
     }
@@ -118,13 +118,18 @@ function AvailableSection({
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-gray-900">
-          Disponibles
-          {available.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-gray-400">· {filtered.length}{hasFilters ? `/${available.length}` : ""}</span>
-          )}
-        </h2>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-gray-900">
+            Disponibles
+            {available.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-400">· {filtered.length}{hasFilters ? `/${available.length}` : ""}</span>
+            )}
+          </h2>
+        </div>
+        <p className="text-xs text-gray-500">
+          Nuevas solicitudes y, si aparecen, traslados sin responsable (p. ej. tras cambio de turno).
+        </p>
       </div>
 
       {/* Filtros */}
@@ -134,7 +139,7 @@ function AvailableSection({
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
             <input
               type="text"
-              placeholder="Ubicación o paciente…"
+              placeholder="Ubicación o Nº historia…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-gray-200 bg-white"
@@ -181,33 +186,56 @@ function AvailableSection({
               key={t.id}
               className={`border-l-4 ${DIFFICULTY_BORDER[t.difficulty] ?? "border-l-gray-300"} border border-gray-200 rounded-xl bg-white shadow-sm flex flex-col`}
             >
-              {/* Cuerpo de la tarjeta */}
+              {/* Cuerpo: fila identidad + contexto (patrón lista / tarea) */}
               <div className="p-4 flex-1 space-y-3">
-                {/* Fila superior */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs text-gray-400">{t.mrn}</span>
-                  <ElapsedTime createdAt={t.createdAt} />
-                </div>
-
-                {/* Ubicación */}
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Origen</p>
-                  <p className="font-semibold text-gray-900 text-sm sm:text-base">{t.location}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Prueba: {TEST_LABELS[t.testType] ?? t.testType}
-                  </p>
-                </div>
-
-                {/* Paciente (anonimizado) */}
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
-                    {t.patientFullName.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}
+                <div className="flex gap-3.5 items-start">
+                  <div
+                    className="w-[4.25rem] h-[4.25rem] rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200/90 flex items-center justify-center text-gray-700 text-lg font-bold shrink-0 tracking-tight shadow-sm"
+                    title="Iniciales: nombre + apellidos (orden en ficha). Identificación completa en detalle."
+                  >
+                    {t.patientInitials}
                   </div>
-                  <p className="text-sm text-gray-700 font-medium truncate">{t.patientFullName}</p>
+                  <div className="flex-1 min-w-0 space-y-1.5 pt-0.5 overflow-hidden pr-1">
+                    <p
+                      className="font-mono text-sm font-semibold text-gray-900 tabular-nums truncate"
+                      title={t.mrn}
+                    >
+                      {t.mrn}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Link
+                        href={`/celador/transfer/${t.id}`}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline shrink-0"
+                      >
+                        Ver ficha
+                      </Link>
+                      {t.status !== "SOLICITADO" && (
+                        <span
+                          className="text-[10px] font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-0.5 shrink-0"
+                          title="Quedó sin celador (p. ej. cambio de turno o baja); puedes retomarlo"
+                        >
+                          Sin responsable
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
+                        Origen
+                      </p>
+                      <p className="font-semibold text-gray-900 text-sm sm:text-base leading-snug">
+                        {t.location}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Prueba: {TEST_LABELS[t.testType] ?? t.testType}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end gap-1.5 text-right pt-0.5 pl-1 min-w-[5.25rem]">
+                    <ElapsedTime createdAt={t.createdAt} />
+                  </div>
                 </div>
 
-                {/* Badges */}
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 pt-0.5 border-t border-gray-100">
                   <DifficultyBadge difficulty={t.difficulty} />
                   <PriorityBadge   priority={t.priority} />
                 </div>
@@ -464,27 +492,50 @@ export default function CeladorClient() {
                   className={`border-l-4 ${DIFFICULTY_BORDER[t.difficulty] ?? "border-l-gray-300"} border border-gray-200 rounded-xl bg-white shadow-sm`}
                 >
                   {/* Info */}
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-gray-400">{t.mrn}</span>
-                          <ElapsedTime createdAt={t.createdAt} />
-                        </div>
-                        <p className="font-semibold text-gray-900 text-sm truncate">{t.patientFullName}</p>
-                        <p className="text-xs text-gray-500">{t.location} · {TEST_LABELS[t.testType] ?? t.testType}</p>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          <StatusBadge     status={t.status} />
-                          <DifficultyBadge difficulty={t.difficulty} />
-                          <PriorityBadge   priority={t.priority} />
-                        </div>
-                      </div>
-                      <Link
-                        href={`/celador/transfer/${t.id}`}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0 self-start pt-0.5"
+                  <div className="p-4 space-y-3">
+                    <div className="flex gap-3.5 items-start">
+                      <div
+                        className="w-[4.25rem] h-[4.25rem] rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200/90 flex items-center justify-center text-gray-700 text-lg font-bold shrink-0 tracking-tight shadow-sm"
+                        title="Iniciales: nombre + apellidos (orden en ficha). Identificación completa en detalle."
                       >
-                        Detalle →
-                      </Link>
+                        {t.patientInitials}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5 pt-0.5 overflow-hidden pr-1">
+                        <p
+                          className="font-mono text-sm font-semibold text-gray-900 tabular-nums truncate"
+                          title={t.mrn}
+                        >
+                          {t.mrn}
+                        </p>
+                        <Link
+                          href={`/celador/transfer/${t.id}`}
+                          className="inline-flex text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline shrink-0"
+                        >
+                          Ver ficha
+                        </Link>
+                        <p className="text-sm text-gray-700 leading-snug">
+                          {t.location}
+                          <span className="text-gray-400 font-normal"> · </span>
+                          <span className="text-gray-500 text-xs">
+                            {TEST_LABELS[t.testType] ?? t.testType}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="shrink-0 flex flex-col items-end gap-2 text-right pt-0.5 pl-1 min-w-[6.5rem]">
+                        <ElapsedTime createdAt={t.createdAt} />
+                        <Link
+                          href={`/celador/transfer/${t.id}`}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                        >
+                          Detalle →
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-100">
+                      <StatusBadge     status={t.status} />
+                      <DifficultyBadge difficulty={t.difficulty} />
+                      <PriorityBadge   priority={t.priority} />
                     </div>
 
                     {/* Contexto de estado */}
@@ -513,6 +564,28 @@ export default function CeladorClient() {
                       ) : (
                         <button disabled={disabled} onClick={() => run(t.id, resumeTransfer)} className={BTN}>
                           ▶ Reanudar
+                        </button>
+                      )}
+
+                      {(t.status === "ASIGNADO" ||
+                        t.status === "EN_CURSO" ||
+                        t.status === "PAUSADO") && (
+                        <button
+                          disabled={disabled}
+                          type="button"
+                          onClick={() => {
+                            if (
+                              !confirm(
+                                "¿Liberar este traslado? Volverá a la cola para que otro celador lo asigne (p. ej. fin de turno). Si requería firma, habrá que firmar de nuevo."
+                              )
+                            ) {
+                              return;
+                            }
+                            void run(t.id, releaseTransferToPool);
+                          }}
+                          className={`${BTN} border-amber-200 text-amber-900 hover:bg-amber-50`}
+                        >
+                          ↩ Liberar a la cola
                         </button>
                       )}
 

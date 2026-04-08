@@ -12,7 +12,8 @@ import {
   SHIFT_LABEL,
   type ShiftName,
 } from "@/lib/shifts";
-import { Shift } from "@prisma/client";
+import { NOTE_LIBERACION_COLA } from "@/lib/transferAuditNotes";
+import { Shift, type TransferStatus } from "@prisma/client";
 
 /* ============================================================
    ESTADOS SIMPLIFICADOS
@@ -70,7 +71,8 @@ export async function assignToMe(formData: FormData) {
   }
 
   const transfer = await prisma.transfer.findUnique({
-    where: { id: transferId },
+    where:  { id: transferId },
+    include: { acceptance: true },
   });
 
   if (!transfer) throw new Error("Traslado no encontrado");
@@ -79,14 +81,43 @@ export async function assignToMe(formData: FormData) {
     throw new Error("Traslado ya asignado");
   }
 
-  const nextStatus = transfer.requiresAcceptance ? "ASIGNADO" : "EN_CURSO";
+  if (
+    transfer.status === "FINALIZADO" ||
+    transfer.status === "CANCELADO" ||
+    transfer.status === "EN_PRUEBA"
+  ) {
+    throw new Error("Este traslado no está disponible para asignación");
+  }
+
+  let nextStatus: TransferStatus;
+  if (transfer.status === "SOLICITADO") {
+    nextStatus = transfer.requiresAcceptance ? "ASIGNADO" : "EN_CURSO";
+  } else {
+    /* Huérfano en cola (sin celador): retomar sin cambiar fase operativa */
+    nextStatus = transfer.status;
+  }
+
+  const stripStaleAcceptance =
+    transfer.status === "ASIGNADO" && !!transfer.acceptance;
+
+  if (stripStaleAcceptance) {
+    await prisma.transferAcceptance.deleteMany({ where: { transferId } });
+  }
 
   await prisma.transfer.update({
     where: { id: transferId },
     data: { assignedToId: celadorId, status: nextStatus },
   });
 
-  await recordEvent(transferId, celadorId, nextStatus, transfer.status);
+  await recordEvent(
+    transferId,
+    celadorId,
+    nextStatus,
+    transfer.status,
+    transfer.status === "SOLICITADO"
+      ? undefined
+      : "Asignado a nuevo celador (antes sin responsable)"
+  );
 
   emitTransferEvent({
     type:       "transfer:assigned",
@@ -99,6 +130,63 @@ export async function assignToMe(formData: FormData) {
   });
 
   revalidatePath("/celador");
+}
+
+/** Devuelve el traslado a la cola (otro compañero / cambio de turno). No aplica en EN_PRUEBA. */
+export async function releaseTransferToPool(formData: FormData) {
+  const transferId = String(formData.get("transferId") ?? "");
+  if (!transferId) throw new Error("Falta transferId");
+
+  const celadorId = await getCeladorSession();
+
+  const transfer = await prisma.transfer.findUnique({
+    where: { id: transferId },
+    include: { acceptance: true },
+  });
+
+  if (!transfer) throw new Error("Traslado no encontrado");
+
+  if (transfer.assignedToId !== celadorId) {
+    throw new Error("Solo el celador asignado puede liberar el traslado");
+  }
+
+  const allowed: TransferStatus[] = ["ASIGNADO", "EN_CURSO", "PAUSADO"];
+  if (!allowed.includes(transfer.status)) {
+    throw new Error(
+      "No se puede liberar en este estado (p. ej. en prueba use coordinación con sala)"
+    );
+  }
+
+  await prisma.$transaction([
+    prisma.transferAcceptance.deleteMany({ where: { transferId } }),
+    prisma.transfer.update({
+      where: { id: transferId },
+      data:  {
+        assignedToId:   null,
+        status:         "SOLICITADO",
+        previousStatus: null,
+      },
+    }),
+  ]);
+
+  await recordEvent(
+    transferId,
+    celadorId,
+    "SOLICITADO",
+    transfer.status,
+    NOTE_LIBERACION_COLA
+  );
+
+  emitTransferEvent({
+    type:        "transfer:released",
+    transferId,
+    status:      "SOLICITADO",
+    tecnicoId:   transfer.createdById,
+    mrn:         transfer.mrn,
+  });
+
+  revalidatePath("/celador");
+  revalidatePath(`/celador/transfer/${transferId}`);
 }
 
 /* ============================================================

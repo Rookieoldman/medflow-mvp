@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createIncident } from "./serverActions";
 import { Card, PageHeader } from "@/components/ui";
@@ -49,8 +50,14 @@ export default async function IncidenciaPage({
           <DifficultyBadge difficulty={transfer.difficulty} />
         </div>
         <p className="font-mono text-xs text-gray-400 mb-1">Nº Historia: {transfer.mrn}</p>
-        <p className="font-medium text-gray-900">{transfer.patientFullName}</p>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <p className="text-sm text-gray-600 mt-1">
+          El nombre completo y datos adicionales del paciente figuran en la{" "}
+          <Link href={`/celador/transfer/${transfer.id}`} className="text-blue-600 font-medium hover:underline">
+            ficha del traslado
+          </Link>
+          .
+        </p>
+        <p className="text-sm text-gray-500 mt-2">
           Nacimiento: {fDate(transfer.dob)} · {transfer.location} → {transfer.testType}
         </p>
       </Card>

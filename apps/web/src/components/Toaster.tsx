@@ -36,6 +36,11 @@ function toastFromEvent(event: MedflowEvent): Omit<Toast, "id"> | null {
         type:    "info",
         message: `Traslado asignado${event.patientName ? `: ${event.patientName}` : ""}`,
       };
+    case "transfer:released":
+      return {
+        type:    "info",
+        message: `Traslado otra vez en cola${event.mrn ? ` · ${event.mrn}` : ""}`,
+      };
     case "transfer:status": {
       const labels: Record<string, { msg: string; type: Toast["type"] }> = {
         EN_CURSO:   { msg: "Traslado en curso",         type: "info"    },

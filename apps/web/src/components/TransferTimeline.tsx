@@ -1,4 +1,5 @@
 import { fDateTime } from "@/lib/format";
+import { isLiberacionColaNote } from "@/lib/transferAuditNotes";
 
 const STATUS_LABELS: Record<string, string> = {
   SOLICITADO: "Solicitado",
@@ -54,6 +55,8 @@ export function TransferTimeline({ events }: { events: Event[] }) {
           [e.actor.firstName, e.actor.lastName1].filter(Boolean).join(" ") ||
           e.actor.email;
 
+        const liberacionCola = isLiberacionColaNote(e.note);
+
         return (
           <li key={e.id} className="mb-6 ml-5">
             {/* dot */}
@@ -65,11 +68,18 @@ export function TransferTimeline({ events }: { events: Event[] }) {
 
             <div className="flex flex-wrap items-baseline gap-2">
               <span className="font-medium text-sm text-gray-900">
-                {STATUS_LABELS[e.toStatus] ?? e.toStatus}
+                {liberacionCola
+                  ? "Liberación a la cola"
+                  : STATUS_LABELS[e.toStatus] ?? e.toStatus}
               </span>
               {e.fromStatus && (
                 <span className="text-xs text-gray-400">
                   desde {STATUS_LABELS[e.fromStatus] ?? e.fromStatus}
+                </span>
+              )}
+              {liberacionCola && (
+                <span className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
+                  Registro auditable
                 </span>
               )}
             </div>
