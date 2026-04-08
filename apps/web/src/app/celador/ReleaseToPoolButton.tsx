@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { releaseTransferToPool } from "./serverActions";
+import {
+  showClientToast,
+  getUserActionErrorMessage,
+  requestCeladorTransfersRefresh,
+} from "@/lib/clientToast";
 
 export function ReleaseToPoolButton({ transferId }: { transferId: string }) {
   const router = useRouter();
@@ -23,8 +28,14 @@ export function ReleaseToPoolButton({ transferId }: { transferId: string }) {
         startTransition(async () => {
           const fd = new FormData();
           fd.set("transferId", transferId);
-          await releaseTransferToPool(fd);
-          router.refresh();
+          try {
+            await releaseTransferToPool(fd);
+            router.refresh();
+            requestCeladorTransfersRefresh();
+          } catch (e) {
+            console.error(e);
+            showClientToast(getUserActionErrorMessage(e), "error");
+          }
         });
       }}
       className="inline-flex items-center gap-2 border rounded-lg px-4 py-2.5 text-sm font-medium text-amber-900 border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-50"

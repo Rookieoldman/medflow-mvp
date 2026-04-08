@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
+import { createIncidentPrecheck } from "@/lib/celadorActionGuards";
 
 export async function createIncident(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -21,17 +22,8 @@ export async function createIncident(formData: FormData) {
   const t = await prisma.transfer.findUnique({ where: { id: transferId } });
   if (!t) throw new Error("Traslado no encontrado");
 
-  if (t.assignedToId !== celadorId) {
-    throw new Error(
-      t.assignedToId
-        ? "No puedes registrar incidencias en un traslado de otro celador"
-        : "Debes tener el traslado asignado para registrar una incidencia"
-    );
-  }
-
-  if (t.status === "FINALIZADO" || t.status === "CANCELADO") {
-    throw new Error("No se pueden registrar incidencias en un traslado cerrado");
-  }
+  const inc = createIncidentPrecheck(t, celadorId);
+  if (!inc.ok) throw new Error(inc.message);
 
   await prisma.incident.create({
     data: {

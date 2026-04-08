@@ -16,6 +16,12 @@ import {
 } from "./serverActions";
 
 import SignatureModal  from "@/components/SignatureModal";
+import {
+  showClientToast,
+  getUserActionErrorMessage,
+  requestCeladorTransfersRefresh,
+  CELADOR_REFRESH_EVENT,
+} from "@/lib/clientToast";
 import { PriorityBadge }   from "@/components/PriorityBadge";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { StatusBadge }     from "@/components/StatusBadge";
@@ -295,6 +301,11 @@ export default function CeladorClient() {
       }
     };
 
+    const onManualRefresh = () => {
+      void fetchData();
+    };
+    window.addEventListener(CELADOR_REFRESH_EVENT, onManualRefresh);
+
     fetchData();
     // Polling de respaldo cada 10 s
     const poll = setInterval(fetchData, 10_000);
@@ -309,6 +320,7 @@ export default function CeladorClient() {
     };
 
     return () => {
+      window.removeEventListener(CELADOR_REFRESH_EVENT, onManualRefresh);
       clearInterval(poll);
       es.close();
     };
@@ -328,6 +340,15 @@ export default function CeladorClient() {
       await action(fd);
     } catch (e) {
       console.error(e);
+      const msg = getUserActionErrorMessage(e);
+      showClientToast(msg, "error");
+      if (
+        msg.includes("Otro celador") ||
+        msg.includes("ya asignado") ||
+        msg.includes("no está disponible para asignación")
+      ) {
+        requestCeladorTransfersRefresh();
+      }
     } finally {
       setPendingId(null);
     }
@@ -335,23 +356,27 @@ export default function CeladorClient() {
 
   function handleBreakToggle() {
     startBreakTransition(async () => {
-      if (onBreak) {
-        await endBreak();
-        setOnBreak(false);
-        setBreakUntil(null);
-        if (breakTimerRef.current) clearTimeout(breakTimerRef.current);
-      } else {
-        await startBreak();
-        const until = new Date(Date.now() + 20 * 60 * 1000).toISOString();
-        setOnBreak(true);
-        setBreakUntil(until);
-        setBreakAvailable(false);
-        // Auto-clear local state cuando el descanso expire
-        if (breakTimerRef.current) clearTimeout(breakTimerRef.current);
-        breakTimerRef.current = setTimeout(() => {
+      try {
+        if (onBreak) {
+          await endBreak();
           setOnBreak(false);
           setBreakUntil(null);
-        }, 20 * 60 * 1000);
+          if (breakTimerRef.current) clearTimeout(breakTimerRef.current);
+        } else {
+          await startBreak();
+          const until = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+          setOnBreak(true);
+          setBreakUntil(until);
+          setBreakAvailable(false);
+          if (breakTimerRef.current) clearTimeout(breakTimerRef.current);
+          breakTimerRef.current = setTimeout(() => {
+            setOnBreak(false);
+            setBreakUntil(null);
+          }, 20 * 60 * 1000);
+        }
+      } catch (e) {
+        console.error(e);
+        showClientToast(getUserActionErrorMessage(e), "error");
       }
     });
   }
@@ -364,9 +389,14 @@ export default function CeladorClient() {
 
   function handleShiftChange(shift: "MANANA" | "TARDE" | "NOCHE" | "OFF") {
     startShiftTransition(async () => {
-      await setOwnShift(shift);
-      setCurrentShift(shift === "OFF" ? null : shift);
-      setShiftOpen(false);
+      try {
+        await setOwnShift(shift);
+        setCurrentShift(shift === "OFF" ? null : shift);
+        setShiftOpen(false);
+      } catch (e) {
+        console.error(e);
+        showClientToast(getUserActionErrorMessage(e), "error");
+      }
     });
   }
 
@@ -635,9 +665,16 @@ export default function CeladorClient() {
           fd.set("signerName",  data.signerName);
           if (data.signerRole) fd.set("signerRole", data.signerRole);
           fd.set("signatureData", data.signatureData);
-          await acceptTransfer(fd);
-          setOpenSig(null);
-          setTimeout(() => setPendingId(null), 1500);
+          try {
+            await acceptTransfer(fd);
+            setOpenSig(null);
+            requestCeladorTransfersRefresh();
+          } catch (e) {
+            console.error(e);
+            showClientToast(getUserActionErrorMessage(e), "error");
+          } finally {
+            setPendingId(null);
+          }
         }}
       />
     </>

@@ -2,12 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MedflowEvent } from "@/lib/eventBus";
+import {
+  CLIENT_TOAST_EVENT,
+  type ClientToastDetail,
+  type ClientToastType,
+} from "@/lib/clientToast";
 
 /* ── tipos ── */
 interface Toast {
   id:      string;
   message: string;
-  type:    "info" | "success" | "warning";
+  type:    ClientToastType;
 }
 
 /* ── icono por tipo ── */
@@ -15,12 +20,14 @@ const ICONS: Record<Toast["type"], string> = {
   info:    "🔔",
   success: "✅",
   warning: "⚠️",
+  error:   "❌",
 };
 
 const COLORS: Record<Toast["type"], string> = {
   info:    "border-blue-200 bg-blue-50 text-blue-800",
   success: "border-green-200 bg-green-50 text-green-800",
   warning: "border-orange-200 bg-orange-50 text-orange-800",
+  error:   "border-red-200 bg-red-50 text-red-900",
 };
 
 /* ── helpers de mensaje ── */
@@ -95,6 +102,19 @@ export default function Toaster() {
 
   const dismiss = (id: string) =>
     setToasts((prev) => prev.filter((t) => t.id !== id));
+
+  useEffect(() => {
+    function onClientToast(ev: Event) {
+      const e = ev as CustomEvent<ClientToastDetail>;
+      if (!e.detail?.message) return;
+      addToast({
+        message: e.detail.message,
+        type:    e.detail.type ?? "warning",
+      });
+    }
+    window.addEventListener(CLIENT_TOAST_EVENT, onClientToast);
+    return () => window.removeEventListener(CLIENT_TOAST_EVENT, onClientToast);
+  }, []);
 
   useEffect(() => {
     let retryTimeout: ReturnType<typeof setTimeout>;

@@ -13,6 +13,11 @@ import {
   type ShiftName,
 } from "@/lib/shifts";
 import { NOTE_LIBERACION_COLA } from "@/lib/transferAuditNotes";
+import {
+  assignFromQueuePrecheck,
+  createIncidentPrecheck,
+  pauseTransferPrecheck,
+} from "@/lib/celadorActionGuards";
 import { Shift, type TransferStatus } from "@prisma/client";
 
 /* ============================================================
@@ -77,55 +82,62 @@ export async function assignToMe(formData: FormData) {
 
   if (!transfer) throw new Error("Traslado no encontrado");
 
-  if (transfer.assignedToId) {
-    throw new Error("Traslado ya asignado");
-  }
+  const pre = assignFromQueuePrecheck(transfer);
+  if (!pre.ok) throw new Error(pre.message);
 
-  if (
-    transfer.status === "FINALIZADO" ||
-    transfer.status === "CANCELADO" ||
-    transfer.status === "EN_PRUEBA"
-  ) {
-    throw new Error("Este traslado no está disponible para asignación");
-  }
+  const { fromStatus, toStatus } = await prisma.$transaction(async (tx) => {
+    const t2 = await tx.transfer.findUnique({
+      where:  { id: transferId },
+      include: { acceptance: true },
+    });
+    if (!t2) throw new Error("Traslado no encontrado");
 
-  let nextStatus: TransferStatus;
-  if (transfer.status === "SOLICITADO") {
-    nextStatus = transfer.requiresAcceptance ? "ASIGNADO" : "EN_CURSO";
-  } else {
-    /* Huérfano en cola (sin celador): retomar sin cambiar fase operativa */
-    nextStatus = transfer.status;
-  }
+    const pre2 = assignFromQueuePrecheck(t2);
+    if (!pre2.ok) throw new Error(pre2.message);
 
-  const stripStaleAcceptance =
-    transfer.status === "ASIGNADO" && !!transfer.acceptance;
+    let next: TransferStatus;
+    if (t2.status === "SOLICITADO") {
+      next = t2.requiresAcceptance ? "ASIGNADO" : "EN_CURSO";
+    } else {
+      next = t2.status;
+    }
 
-  if (stripStaleAcceptance) {
-    await prisma.transferAcceptance.deleteMany({ where: { transferId } });
-  }
+    const stripStale = t2.status === "ASIGNADO" && !!t2.acceptance;
+    if (stripStale) {
+      await tx.transferAcceptance.deleteMany({ where: { transferId } });
+    }
 
-  await prisma.transfer.update({
-    where: { id: transferId },
-    data: { assignedToId: celadorId, status: nextStatus },
+    const updated = await tx.transfer.updateMany({
+      where: { id: transferId, assignedToId: null },
+      data:  { assignedToId: celadorId, status: next },
+    });
+
+    if (updated.count !== 1) {
+      throw new Error(
+        "Otro celador se ha asignado este traslado. La lista se actualizará."
+      );
+    }
+
+    return { fromStatus: t2.status, toStatus: next };
   });
 
   await recordEvent(
     transferId,
     celadorId,
-    nextStatus,
-    transfer.status,
-    transfer.status === "SOLICITADO"
+    toStatus,
+    fromStatus,
+    fromStatus === "SOLICITADO"
       ? undefined
       : "Asignado a nuevo celador (antes sin responsable)"
   );
 
   emitTransferEvent({
-    type:       "transfer:assigned",
+    type:        "transfer:assigned",
     transferId,
-    status:     nextStatus,
+    status:      toStatus,
     celadorId,
-    tecnicoId:  transfer.createdById,
-    mrn:        transfer.mrn,
+    tecnicoId:   transfer.createdById,
+    mrn:         transfer.mrn,
     patientName: transfer.patientFullName,
   });
 
@@ -260,9 +272,8 @@ export async function pauseTransfer(formData: FormData) {
 
   if (transfer.status === "PAUSADO") return;
 
-  if (transfer.status !== "EN_CURSO") {
-    throw new Error("Solo se puede pausar un traslado en curso");
-  }
+  const pauseOk = pauseTransferPrecheck(transfer.status);
+  if (!pauseOk.ok) throw new Error(pauseOk.message);
 
   await prisma.transfer.update({
     where: { id: transferId },
