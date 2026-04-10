@@ -152,7 +152,11 @@ export default function Toaster() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none">
+    <div
+      className="fixed z-50 flex flex-col gap-2 items-end pointer-events-none
+        bottom-[max(1rem,env(safe-area-inset-bottom))]
+        right-[max(1rem,env(safe-area-inset-right))]"
+    >
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastItem toast={t} onDismiss={() => dismiss(t.id)} />

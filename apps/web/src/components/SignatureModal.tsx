@@ -101,13 +101,22 @@ export default function SignatureModal({ open, onClose, onConfirm }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 pt-[env(safe-area-inset-top)]"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-xl shadow-xl space-y-4 p-5 rounded-t-2xl">
-        <div className="flex items-center justify-between">
+      <div
+        className="bg-white w-full max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-bottom)-1rem))] overflow-y-auto overscroll-contain sm:max-w-lg sm:rounded-xl shadow-xl space-y-4 p-5 rounded-t-2xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+      >
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-gray-900">Firma del responsable</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-gray-400 hover:text-gray-700 text-lg leading-none rounded-lg hover:bg-gray-100"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="space-y-2.5">
@@ -149,14 +158,16 @@ export default function SignatureModal({ open, onClose, onConfirm }: Props) {
 
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <button
+            type="button"
             onClick={handleConfirm}
-            className="flex-1 bg-gray-900 text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-gray-700 transition-colors"
+            className="flex-1 min-h-12 bg-gray-900 text-white rounded-lg px-4 py-3 text-base font-medium hover:bg-gray-700 transition-colors"
           >
             Confirmar aceptación
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex-1 min-h-12 border border-gray-200 rounded-lg px-4 py-3 text-base text-gray-600 hover:bg-gray-50 transition-colors"
           >
             Cancelar
           </button>

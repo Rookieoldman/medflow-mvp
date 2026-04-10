@@ -89,7 +89,8 @@ const STATUS_CTX: Record<string, string> = {
   EN_PRUEBA: "Paciente en la sala — prueba en curso",
 };
 
-const BTN = "border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+const BTN =
+  "inline-flex items-center justify-center min-h-11 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
 
 /* ── Sección "Disponibles" con filtros ── */
 function AvailableSection({
@@ -133,7 +134,7 @@ function AvailableSection({
             )}
           </h2>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-gray-500 leading-snug">
           Nuevas solicitudes y, si aparecen, traslados sin responsable (p. ej. tras cambio de turno).
         </p>
       </div>
@@ -148,13 +149,13 @@ function AvailableSection({
               placeholder="Ubicación o Nº historia…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-xs w-full focus:outline-none focus:ring-2 focus:ring-gray-200 bg-white"
+              className="border border-gray-200 rounded-lg pl-7 pr-3 py-2.5 min-h-11 text-sm w-full focus:outline-none focus:ring-2 focus:ring-gray-200 bg-white"
             />
           </div>
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value)}
-            className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+            className="border border-gray-200 rounded-lg px-2.5 py-2 min-h-11 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
           >
             <option value="">Dificultad</option>
             <option value="CRITICO">🔴 Crítico</option>
@@ -164,7 +165,7 @@ function AvailableSection({
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
+            className="border border-gray-200 rounded-lg px-2.5 py-2 min-h-11 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
           >
             <option value="">Prioridad</option>
             <option value="URGENTE">🔴 Urgente</option>
@@ -172,8 +173,9 @@ function AvailableSection({
           </select>
           {hasFilters && (
             <button
+              type="button"
               onClick={() => { setSearch(""); setDifficulty(""); setPriority(""); }}
-              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
+              className="inline-flex items-center justify-center min-h-11 border border-gray-200 rounded-lg px-3 text-sm text-gray-500 hover:bg-gray-50"
             >
               Limpiar
             </button>
@@ -211,7 +213,7 @@ function AvailableSection({
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Link
                         href={`/celador/transfer/${t.id}`}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline shrink-0"
+                        className="inline-flex items-center min-h-11 -ml-1 px-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline shrink-0 rounded-lg active:bg-blue-50"
                       >
                         Ver ficha
                       </Link>
@@ -250,9 +252,10 @@ function AvailableSection({
               {/* CTA */}
               <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl">
                 <button
+                  type="button"
                   disabled={!!pendingId || onBreak}
                   onClick={() => onAssign(t.id)}
-                  className="w-full bg-gray-900 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                  className="w-full min-h-12 bg-gray-900 text-white text-base font-medium rounded-lg py-3 hover:bg-gray-700 disabled:opacity-40 transition-colors"
                 >
                   {onBreak ? "☕ En descanso" : pendingId === t.id ? "Asignando…" : "Asignarme este traslado"}
                 </button>
@@ -408,18 +411,19 @@ export default function CeladorClient() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {currentShift ? (
-            <span className={`text-xs font-medium border rounded-lg px-3 py-1.5 ${SHIFT_COLOR[currentShift] ?? ""}`}>
+            <span className={`text-sm font-medium border rounded-lg px-3 py-2 ${SHIFT_COLOR[currentShift] ?? ""}`}>
               {SHIFT_LABEL[currentShift] ?? currentShift}
             </span>
           ) : (
-            <span className="text-xs text-gray-400 border border-dashed border-gray-300 rounded-lg px-3 py-1.5">
+            <span className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2">
               Sin turno asignado
             </span>
           )}
           <button
+            type="button"
             onClick={() => setShiftOpen((v) => !v)}
             disabled={shiftPending}
-            className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2 disabled:opacity-40"
+            className="inline-flex items-center justify-center min-h-11 px-2 -mx-1 text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2 rounded-lg active:bg-gray-100 disabled:opacity-40"
           >
             {shiftPending ? "Guardando…" : "Cambiar turno"}
           </button>
@@ -433,10 +437,11 @@ export default function CeladorClient() {
           <div className="flex flex-wrap gap-2">
             {SHIFTS.map(({ value, label, sub }) => (
               <button
+                type="button"
                 key={value}
                 disabled={shiftPending}
                 onClick={() => handleShiftChange(value)}
-                className={`flex-1 min-w-[90px] border rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40 ${
+                className={`flex-1 min-w-[90px] min-h-12 border rounded-lg px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-40 ${
                   currentShift === value
                     ? "bg-gray-900 text-white border-gray-900"
                     : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
@@ -448,9 +453,10 @@ export default function CeladorClient() {
             ))}
             {currentShift && (
               <button
+                type="button"
                 disabled={shiftPending}
                 onClick={() => handleShiftChange("OFF")}
-                className="border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                className="inline-flex items-center justify-center min-h-11 border border-dashed border-gray-300 rounded-lg px-3 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
               >
                 Quitar turno
               </button>
@@ -471,9 +477,10 @@ export default function CeladorClient() {
             </p>
           </div>
           <button
+            type="button"
             disabled={breakPending}
             onClick={handleBreakToggle}
-            className="shrink-0 border border-amber-300 bg-white text-amber-700 text-xs font-medium rounded-lg px-3 py-2 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+            className="shrink-0 inline-flex items-center justify-center min-h-11 border border-amber-300 bg-white text-amber-800 text-sm font-medium rounded-lg px-4 py-2 hover:bg-amber-100 disabled:opacity-50 transition-colors"
           >
             Volver antes
           </button>
@@ -482,9 +489,10 @@ export default function CeladorClient() {
         <div className="flex justify-end">
           {breakAvailable ? (
             <button
+              type="button"
               disabled={breakPending || !!pendingId}
               onClick={handleBreakToggle}
-              className="border border-gray-200 text-gray-500 text-xs font-medium rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center justify-center min-h-11 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-40 transition-colors"
             >
               ☕ Iniciar descanso (20 min)
             </button>
@@ -547,7 +555,7 @@ export default function CeladorClient() {
                         </p>
                         <Link
                           href={`/celador/transfer/${t.id}`}
-                          className="inline-flex text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline shrink-0"
+                          className="inline-flex items-center min-h-11 -ml-1 px-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline shrink-0 rounded-lg active:bg-blue-50"
                         >
                           Ver ficha
                         </Link>
@@ -563,7 +571,7 @@ export default function CeladorClient() {
                         <ElapsedTime createdAt={t.createdAt} />
                         <Link
                           href={`/celador/transfer/${t.id}`}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                          className="inline-flex items-center justify-end min-h-11 -mr-1 pl-2 text-sm font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap rounded-lg active:bg-blue-50"
                         >
                           Detalle →
                         </Link>
@@ -589,18 +597,18 @@ export default function CeladorClient() {
                     <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl flex flex-wrap gap-2">
                       {/* Firma */}
                       {t.status === "ASIGNADO" && t.requiresAcceptance && (
-                        <button disabled={disabled} onClick={() => setOpenSig(t.id)} className={BTN}>
+                        <button type="button" disabled={disabled} onClick={() => setOpenSig(t.id)} className={BTN}>
                           ✍ Firmar responsable
                         </button>
                       )}
 
                       {/* Pausar / Reanudar */}
                       {t.status !== "PAUSADO" ? (
-                        <button disabled={disabled} onClick={() => run(t.id, pauseTransfer)} className={BTN}>
+                        <button type="button" disabled={disabled} onClick={() => run(t.id, pauseTransfer)} className={BTN}>
                           ⏸ Pausar
                         </button>
                       ) : (
-                        <button disabled={disabled} onClick={() => run(t.id, resumeTransfer)} className={BTN}>
+                        <button type="button" disabled={disabled} onClick={() => run(t.id, resumeTransfer)} className={BTN}>
                           ▶ Reanudar
                         </button>
                       )}
@@ -634,13 +642,14 @@ export default function CeladorClient() {
                   {/* EN_PRUEBA — el celador finaliza el traslado */}
                   {t.status === "EN_PRUEBA" && (
                     <div className="px-4 py-3 border-t border-violet-100 bg-violet-50 rounded-b-xl space-y-2">
-                      <p className="text-xs text-violet-700 font-medium">
+                      <p className="text-sm text-violet-800 font-medium leading-snug">
                         🔬 Técnico realizando la prueba — confirma cuando haya terminado
                       </p>
                       <button
+                        type="button"
                         disabled={disabled}
                         onClick={() => run(t.id, setStatus, (fd) => fd.set("next", "FINALIZADO"))}
-                        className="w-full bg-green-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-green-700 disabled:opacity-40 transition-colors"
+                        className="w-full min-h-12 bg-green-600 text-white text-base font-medium rounded-lg py-3 hover:bg-green-700 disabled:opacity-40 transition-colors"
                       >
                         {disabled ? "Finalizando…" : "✓ Finalizar traslado"}
                       </button>

@@ -19,10 +19,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor:    "#111827",
-  width:         "device-width",
-  initialScale:  1,
-  maximumScale:  1,
+  themeColor:      "#111827",
+  width:           "device-width",
+  initialScale:    1,
+  // Permite zoom por accesibilidad (vista cansada, texto pequeño en móvil)
+  maximumScale:    5,
+  userScalable:    true,
+  viewportFit:     "cover",
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -43,29 +46,30 @@ export default async function RootLayout({
     <html lang="es">
       <body className="min-h-screen bg-gray-50">
         {session && (
-          <header className="sticky top-0 z-30 border-b border-gray-200 bg-white px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shadow-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* logo mark */}
+          <header
+            className="sticky top-0 z-30 border-b border-gray-200 bg-white shadow-sm
+              pt-[max(0.75rem,env(safe-area-inset-top))]
+              pb-3
+              pl-[max(1rem,env(safe-area-inset-left))]
+              pr-[max(1rem,env(safe-area-inset-right))]
+              flex items-center justify-between gap-3 sm:gap-4"
+          >
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <span className="text-base font-bold text-gray-900 tracking-tight shrink-0">
                 MedFlow
               </span>
-              <span className="hidden sm:block text-gray-300">|</span>
-              <span className="hidden sm:block text-sm text-gray-500 truncate">
+              <span className="hidden sm:inline text-gray-300 shrink-0">|</span>
+              <span className="min-w-0 truncate text-sm text-gray-600 sm:text-gray-500">
                 {user?.firstName
                   ? `${user.firstName} · ${ROLE_LABEL[user?.role] ?? user?.role}`
                   : user?.email}
               </span>
             </div>
 
-            {/* mobile: rol badge */}
-            <span className="sm:hidden text-xs font-medium text-gray-500 truncate max-w-[100px]">
-              {ROLE_LABEL[user?.role] ?? user?.role}
-            </span>
-
-            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <Link
                 href="/account"
-                className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                className="inline-flex items-center justify-center min-h-11 px-2 -mx-1 text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2 rounded-lg active:bg-gray-100"
               >
                 Mi cuenta
               </Link>
@@ -74,7 +78,9 @@ export default async function RootLayout({
           </header>
         )}
 
-        <div className="min-h-[calc(100vh-57px)]">{children}</div>
+        <div className="min-h-[calc(100vh-57px)] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {children}
+        </div>
         {session && <Toaster />}
         {session && <PwaRegister />}
       </body>
