@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState, useEffect, useRef } from "react";
+import { useFormStatus } from "react-dom";
 import { changePassword, type ChangePasswordState } from "./actions";
 
 const initial: ChangePasswordState = { error: null, ok: false };
@@ -20,7 +20,7 @@ function SubmitButton() {
 }
 
 export default function ChangePasswordForm() {
-  const [state, formAction] = useFormState(changePassword, initial);
+  const [state, formAction] = useActionState(changePassword, initial);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {

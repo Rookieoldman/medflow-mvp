@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { chartAxisTick, chartLegendWrapperStyle, chartTooltipProps } from "@/lib/chartTheme";
 import type { ExploreTrendsResult, TrendValueKind } from "./trends";
 
 type TrendGranularity = ExploreTrendsResult["granularity"];
@@ -50,7 +51,7 @@ export default function ExploreTrendsChart({ periodLabel, result }: Props) {
 
   if (!points.length || !lines.length) {
     return (
-      <div className="border border-gray-200 rounded-xl bg-white p-6 text-sm text-gray-400">
+      <div className="rounded-2xl border border-stone-200/90 bg-stone-50/80 p-8 text-center text-sm text-stone-500 ring-1 ring-stone-100/80">
         Sin datos para tendencias en este rango.
       </div>
     );
@@ -60,37 +61,42 @@ export default function ExploreTrendsChart({ periodLabel, result }: Props) {
   const connectNulls = valueKind !== "count";
 
   return (
-    <div className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{periodLabel}</p>
-        <h2 className="text-sm font-semibold text-gray-900 mt-0.5">{metricTitle}</h2>
+    <div className="relative overflow-hidden rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/90 p-4 shadow-md shadow-stone-900/[0.06] ring-1 ring-stone-100/80 sm:p-5">
+      <div className="h-1 w-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 opacity-90" />
+      <div className="mt-4 space-y-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">{periodLabel}</p>
+        <h2 className="text-base font-semibold tracking-tight text-stone-900">{metricTitle}</h2>
         {metricSubtitle ? (
-          <p className="text-xs text-amber-800/90 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1.5 mt-2">
+          <p className="mt-2 rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
             {metricSubtitle}
           </p>
         ) : null}
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="pt-1 text-xs leading-relaxed text-stone-500">
           Agregación {GRAN_LABEL[granularity]}. {VALUE_HINT[valueKind]}
         </p>
       </div>
-      <div className="h-[min(360px,50vh)] min-h-[280px] w-full min-w-0">
+      <div className="mt-4 h-[min(360px,50vh)] min-h-[280px] w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-gray-100" />
+          <LineChart data={chartRows} margin={{ top: 12, right: 12, left: 0, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="4 4" stroke="#e7e5e4" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10 }}
+              tick={{ ...chartAxisTick, fontSize: 10 }}
               interval="preserveStartEnd"
               minTickGap={24}
+              axisLine={false}
+              tickLine={false}
             />
             <YAxis
               allowDecimals={yDecimals}
-              tick={{ fontSize: 11 }}
+              tick={{ ...chartAxisTick, fontSize: 11 }}
               width={valueKind === "percent" ? 40 : 44}
               tickFormatter={(v) => (valueKind === "percent" ? `${v}%` : `${v}`)}
+              axisLine={false}
+              tickLine={false}
             />
             <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              {...chartTooltipProps}
               labelFormatter={(_, p) => {
                 const row = p?.[0]?.payload as { key?: string } | undefined;
                 return row?.key ?? "";
@@ -100,7 +106,7 @@ export default function ExploreTrendsChart({ periodLabel, result }: Props) {
                 name ?? "",
               ]}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend wrapperStyle={chartLegendWrapperStyle} />
             {lines.map((ln) => (
               <Line
                 key={ln.id}
@@ -108,9 +114,9 @@ export default function ExploreTrendsChart({ periodLabel, result }: Props) {
                 dataKey={ln.id}
                 name={ln.name}
                 stroke={ln.color}
-                strokeWidth={2}
+                strokeWidth={2.25}
                 dot={false}
-                activeDot={{ r: 4 }}
+                activeDot={{ r: 5, strokeWidth: 0 }}
                 connectNulls={connectNulls}
               />
             ))}

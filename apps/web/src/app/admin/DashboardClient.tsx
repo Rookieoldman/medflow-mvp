@@ -76,6 +76,15 @@ const STATUS_BADGE: Record<string, string> = {
   PAUSADO:    "bg-gray-100 text-gray-600",
 };
 
+/** Franja proporcional bajo la leyenda de estados */
+const STATUS_STRIP_SEGMENT: Record<string, string> = {
+  SOLICITADO: "bg-amber-400",
+  ASIGNADO:   "bg-blue-500",
+  EN_CURSO:   "bg-emerald-500",
+  EN_PRUEBA:  "bg-violet-500",
+  PAUSADO:    "bg-stone-400",
+};
+
 const DIFF_CONFIG: Record<string, string> = {
   BANAL:    "text-green-700",
   MODERADO: "text-yellow-600",
@@ -163,27 +172,27 @@ export default function DashboardClient({
     <div className="space-y-5">
 
       {/* ── KPI CARDS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Activos hoy</p>
-          <p className="text-4xl font-bold text-gray-900 mt-1">{total}</p>
-          <p className="text-xs text-gray-400 mt-1">traslados en curso</p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/80 p-5 shadow-md shadow-stone-900/[0.04] ring-1 ring-stone-100/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Activos hoy</p>
+          <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight text-stone-900">{total}</p>
+          <p className="mt-1 text-xs text-stone-500">Traslados en curso</p>
         </div>
-        <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+        <div className="rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/80 p-5 shadow-md shadow-stone-900/[0.04] ring-1 ring-stone-100/80">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
             En riesgo SLA
             <InfoTooltip text="Traslados que llevan más tiempo del permitido en su estado actual según su dificultad y prioridad. Requieren atención inmediata." />
           </p>
-          <p className={`text-4xl font-bold mt-1 ${riskColor}`}>{liveRiskCount}</p>
-          <p className="text-xs text-gray-400 mt-1">superan el umbral</p>
+          <p className={`mt-1 text-4xl font-bold tabular-nums tracking-tight ${riskColor}`}>{liveRiskCount}</p>
+          <p className="mt-1 text-xs text-stone-500">Superan el umbral</p>
         </div>
-        <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+        <div className="rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/80 p-5 shadow-md shadow-stone-900/[0.04] ring-1 ring-stone-100/80">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
             Cumplimiento SLA
             <InfoTooltip text="SLA (Service Level Agreement): porcentaje de traslados activos que están dentro del tiempo máximo permitido según su dificultad y prioridad." />
           </p>
-          <p className={`text-4xl font-bold mt-1 ${slaColor}`}>{liveSla}%</p>
-          <p className="text-xs text-gray-400 mt-1">en tiempo real · actualiza c/30s</p>
+          <p className={`mt-1 text-4xl font-bold tabular-nums tracking-tight ${slaColor}`}>{liveSla}%</p>
+          <p className="mt-1 text-xs text-stone-500">En tiempo real · actualiza c/30s</p>
         </div>
       </div>
 
@@ -282,23 +291,50 @@ export default function DashboardClient({
       )}
 
       {/* ── DESGLOSE POR ESTADO ── */}
-      <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Distribución por estado
-        </h2>
-        <div className="flex gap-3 flex-wrap">
+      <div className="rounded-2xl border border-stone-200/90 bg-gradient-to-b from-white to-stone-50/80 p-5 shadow-md shadow-stone-900/[0.04] ring-1 ring-stone-100/80">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            Distribución por estado
+          </h2>
+        </div>
+        {(() => {
+          const statusTotal = statusBreakdown.reduce((a, s) => a + s.count, 0);
+          return statusTotal > 0 ? (
+            <div
+              className="mb-4 flex h-3 w-full overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200/70"
+              role="img"
+              aria-label="Proporción de traslados por estado"
+            >
+              {statusBreakdown.map(({ status, count }) => {
+                if (count <= 0) return null;
+                const pct = (count / statusTotal) * 100;
+                const cfg = STATUS_CONFIG[status] ?? { label: status, dot: "bg-gray-300" };
+                const seg = STATUS_STRIP_SEGMENT[status] ?? "bg-stone-300";
+                return (
+                  <div
+                    key={status}
+                    className={`min-w-[3px] shrink-0 transition-opacity hover:opacity-90 ${seg}`}
+                    style={{ width: `${pct}%` }}
+                    title={`${cfg.label}: ${count} (${pct.toFixed(0)}%)`}
+                  />
+                );
+              })}
+            </div>
+          ) : null;
+        })()}
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           {statusBreakdown.map(({ status, count }) => {
             const cfg = STATUS_CONFIG[status] ?? { label: status, dot: "bg-gray-300" };
             return (
-              <div key={status} className="flex items-center gap-1.5 text-sm text-gray-700">
-                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+              <div key={status} className="flex items-center gap-1.5 text-sm text-stone-700">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cfg.dot}`} />
                 <span>{cfg.label}</span>
-                <span className="font-semibold text-gray-900">{count}</span>
+                <span className="font-semibold tabular-nums text-stone-900">{count}</span>
               </div>
             );
           })}
           {statusBreakdown.every(({ count }) => count === 0) && (
-            <p className="text-sm text-gray-400">Sin traslados activos</p>
+            <p className="text-sm text-stone-500">Sin traslados activos</p>
           )}
         </div>
       </div>

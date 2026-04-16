@@ -72,6 +72,15 @@ export default async function AdminTransferDetail({
         title={transfer.patientFullName}
         subtitle={`Nº Historia: ${transfer.mrn}`}
         back={{ href: "/admin/transfers", label: "Volver a traslados" }}
+        action={
+          <a
+            href={`/api/admin/transfer/${transfer.id}/pdf`}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-colors"
+            download
+          >
+            Descargar PDF
+          </a>
+        }
       />
 
       {/* ── ESTADO + BADGES ── */}

@@ -19,7 +19,15 @@ import {
   periodScopeToExploreDefaults,
   type ExploreKpi,
 } from "@/lib/statsExplore";
-import ChartsClient from "./ChartsClient";
+import { getShift } from "@/lib/shifts";
+import {
+  buildDailyShiftChartData,
+  localDayKeyFromDate,
+  type DailyFinishedTransferDetail,
+  type DailyShiftRow,
+} from "@/lib/statsDailyByShift";
+import ChartsClient, { type ScopePriorityChartRow } from "./ChartsClient";
+import DailyShiftChartClient from "./DailyShiftChartClient";
 import StatsPeriodFilters from "./StatsPeriodFilters";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +69,14 @@ const TABS = [
   { id: "celador",  label: "Celadores" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
+
+function userDisplayName(u: {
+  firstName: string | null;
+  lastName1: string | null;
+  email: string;
+}): string {
+  return [u.firstName, u.lastName1].filter(Boolean).join(" ") || u.email;
+}
 
 /* ================================================================
    PAGE
@@ -110,7 +126,8 @@ export default async function StatsPage({
       byPriority,
       byDifficulty,
       byScope,
-      finishedInPeriod,
+      scopePriorityBreakdown,
+      finishedRows,
       cancelledInPeriod,
       incidentsInPeriod,
     ] = await Promise.all([
@@ -130,9 +147,32 @@ export default async function StatsPage({
       prisma.transfer.groupBy({ by: ["priority"],   where: whereCreated, _count: true }),
       prisma.transfer.groupBy({ by: ["difficulty"], where: whereCreated, _count: true }),
       prisma.transfer.groupBy({ by: ["scope"],      where: whereCreated, _count: true }),
+      prisma.transfer.groupBy({
+        by: ["scope", "priority"],
+        where: whereCreated,
+        _count: true,
+      }),
       prisma.transfer.findMany({
         where: whereFin,
-        select: { createdAt: true, updatedAt: true },
+        select: {
+          id: true,
+          mrn: true,
+          patientFullName: true,
+          dob: true,
+          location: true,
+          testType: true,
+          priority: true,
+          difficulty: true,
+          scope: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: { firstName: true, lastName1: true, email: true },
+          },
+          assignedTo: {
+            select: { firstName: true, lastName1: true, email: true },
+          },
+        },
       }),
       prisma.transfer.count({ where: whereCan }),
       prisma.incident.count({
@@ -146,25 +186,59 @@ export default async function StatsPage({
     ]);
 
     const avgTime =
-      finishedInPeriod.length > 0
+      finishedRows.length > 0
         ? Math.round(
-            finishedInPeriod.reduce(
+            finishedRows.reduce(
               (a, t) => a + (t.updatedAt.getTime() - t.createdAt.getTime()) / 60000,
               0
-            ) / finishedInPeriod.length
+            ) / finishedRows.length
           )
         : 0;
 
-    const closedInPeriod = finishedInPeriod.length + cancelledInPeriod;
+    const closedInPeriod = finishedRows.length + cancelledInPeriod;
     const successAmongClosed =
       closedInPeriod > 0
-        ? Math.round((finishedInPeriod.length / closedInPeriod) * 100)
+        ? Math.round((finishedRows.length / closedInPeriod) * 100)
         : 0;
 
     const completionVsCreated =
       createdInPeriod > 0
-        ? Math.round((finishedInPeriod.length / createdInPeriod) * 100)
+        ? Math.round((finishedRows.length / createdInPeriod) * 100)
         : 0;
+
+    const dailyShiftSeries: DailyShiftRow[] = buildDailyShiftChartData(
+      finishedRows,
+      pStart
+    );
+
+    const scopePriorityChart = buildScopePriorityChart(scopePriorityBreakdown, scopeKey);
+
+    const finishedTransfersByDay: Record<string, DailyFinishedTransferDetail[]> = {};
+    for (const t of finishedRows) {
+      const dk = localDayKeyFromDate(t.updatedAt);
+      if (!finishedTransfersByDay[dk]) finishedTransfersByDay[dk] = [];
+      finishedTransfersByDay[dk].push({
+        id: t.id,
+        mrn: t.mrn,
+        patientFullName: t.patientFullName,
+        dob: t.dob.toISOString(),
+        location: t.location,
+        testType: t.testType,
+        priority: t.priority,
+        difficulty: t.difficulty,
+        scope: t.scope,
+        createdAt: t.createdAt.toISOString(),
+        updatedAt: t.updatedAt.toISOString(),
+        closedShift: getShift(t.updatedAt),
+        createdByLabel: userDisplayName(t.createdBy),
+        assignedToLabel: t.assignedTo ? userDisplayName(t.assignedTo) : null,
+      });
+    }
+    for (const k of Object.keys(finishedTransfersByDay)) {
+      finishedTransfersByDay[k].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+    }
 
     global = {
       periodKey,
@@ -180,11 +254,14 @@ export default async function StatsPage({
       byDifficulty,
       byScope,
       avgTime,
-      finishedInPeriod: finishedInPeriod.length,
+      finishedInPeriod: finishedRows.length,
       cancelledInPeriod,
       incidentsInPeriod,
       successAmongClosed,
       completionVsCreated,
+      dailyShiftSeries,
+      finishedTransfersByDay,
+      scopePriorityChart,
     };
   }
 
@@ -374,6 +451,42 @@ const SCOPE_CHART_LABELS: Record<string, string> = {
   URGENCIAS: "Urgencias",
 };
 
+/** Prisma `groupBy` con `_count: true` expone el total como número; con objeto es `_all`. */
+function prismaGroupCount(r: { _count: number | { _all: number } }): number {
+  const c = r._count;
+  if (typeof c === "number") return c;
+  if (c && typeof c === "object" && typeof c._all === "number") return c._all;
+  return 0;
+}
+
+function buildScopePriorityChart(
+  rows: { scope: string; priority: string; _count: number | { _all: number } }[],
+  scopeKey: StatsScopeKey
+): ScopePriorityChartRow[] {
+  const agg = new Map<string, { NORMAL: number; URGENTE: number }>();
+  for (const r of rows) {
+    const n = prismaGroupCount(r);
+    if (!agg.has(r.scope)) agg.set(r.scope, { NORMAL: 0, URGENTE: 0 });
+    const a = agg.get(r.scope)!;
+    if (r.priority === "URGENTE") a.URGENTE += n;
+    else a.NORMAL += n;
+  }
+  const order = ["PLANTA", "URGENCIAS"] as const;
+  const out: ScopePriorityChartRow[] = [];
+  for (const sc of order) {
+    if (scopeKey && sc !== scopeKey) continue;
+    const v = agg.get(sc);
+    if (!v || (v.NORMAL === 0 && v.URGENTE === 0)) continue;
+    out.push({
+      name: SCOPE_CHART_LABELS[sc] ?? sc,
+      scopeRaw: sc,
+      NORMAL: v.NORMAL,
+      URGENTE: v.URGENTE,
+    });
+  }
+  return out;
+}
+
 type GlobalData = {
   periodKey:            StatsPeriodKey;
   scopeKey:             StatsScopeKey;
@@ -393,6 +506,9 @@ type GlobalData = {
   incidentsInPeriod:    number;
   successAmongClosed:   number;
   completionVsCreated:  number;
+  dailyShiftSeries:     DailyShiftRow[];
+  finishedTransfersByDay: Record<string, DailyFinishedTransferDetail[]>;
+  scopePriorityChart:   ScopePriorityChartRow[];
 };
 
 function GlobalTab({
@@ -407,11 +523,6 @@ function GlobalTab({
   const slice = (dim: "status" | "testType" | "priority" | "difficulty" | "scope", val: string) =>
     exploreUrl({ view: "slice", dim, val, ...explore });
 
-  const chartStatusData = data.byStatus.map((s) => ({
-    name:   STATUS_LABELS[s.status] ?? s.status,
-    value:  s._count,
-    rawVal: s.status,
-  }));
   const chartTestTypeData = data.byTestType.map((t) => ({
     name:   TEST_LABELS[t.testType] ?? t.testType,
     value:  t._count,
@@ -457,6 +568,11 @@ function GlobalTab({
           }
         />
       </section>
+
+      <DailyShiftChartClient
+        data={data.dailyShiftSeries}
+        finishedByDay={data.finishedTransfersByDay}
+      />
 
       {/* Tasas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -629,7 +745,7 @@ function GlobalTab({
 
       {/* CHARTS (recharts) */}
       <ChartsClient
-        byStatus={chartStatusData}
+        scopePriorityChart={data.scopePriorityChart}
         byTestType={chartTestTypeData}
         byPriority={chartPriorityData}
         explore={explore}
