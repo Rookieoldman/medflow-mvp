@@ -32,12 +32,18 @@ export async function GET(req: NextRequest) {
       function onEvent(event: MedflowEvent) {
         // Filtrar: solo enviar eventos relevantes para este usuario
         const isAdmin   = role === "ADMIN";
+        const isOwnShift =
+          event.type === "staff:shift" && event.staffUserId === userId;
         const isCelador = role === "CELADOR" && (
           event.celadorId === userId ||
           event.type === "transfer:new" ||
-          event.type === "transfer:released"
+          event.type === "transfer:released" ||
+          isOwnShift
         );
-        const isTecnico = role === "TECNICO" && event.tecnicoId === userId;
+        const isTecnico = role === "TECNICO" && (
+          event.tecnicoId === userId ||
+          isOwnShift
+        );
 
         if (isAdmin || isCelador || isTecnico) {
           send(event);

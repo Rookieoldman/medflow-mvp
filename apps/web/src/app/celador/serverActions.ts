@@ -10,7 +10,6 @@ import {
   breakUsedInCurrentShift,
   getShift,
   SHIFT_LABEL,
-  type ShiftName,
 } from "@/lib/shifts";
 import { NOTE_LIBERACION_COLA } from "@/lib/transferAuditNotes";
 import {
@@ -18,7 +17,7 @@ import {
   createIncidentPrecheck,
   pauseTransferPrecheck,
 } from "@/lib/celadorActionGuards";
-import { Shift, type TransferStatus } from "@prisma/client";
+import { type TransferStatus } from "@prisma/client";
 
 /* ============================================================
    ESTADOS SIMPLIFICADOS
@@ -429,22 +428,4 @@ export async function endBreak() {
 
   emitTransferEvent({ type: "celador:break", celadorId });
   revalidatePath("/celador");
-}
-
-/** El celador cambia su turno activo; resetea descanso. */
-export async function setOwnShift(shift: ShiftName | "OFF") {
-  const celadorId = await getCeladorSession();
-
-  await prisma.user.update({
-    where: { id: celadorId },
-    data:  {
-      activeShift: shift === "OFF" ? null : (shift as Shift),
-      breakUsedAt: shift === "OFF" ? undefined : null,
-      breakUntil:  shift === "OFF" ? null : undefined,
-    },
-  });
-
-  emitTransferEvent({ type: "celador:break", celadorId });
-  revalidatePath("/celador");
-  revalidatePath("/admin");
 }

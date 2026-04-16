@@ -6,6 +6,9 @@ import { EmptyState } from "@/components/ui";
 import { DifficultyBadge } from "@/components/DifficultyBadge";
 import { PriorityBadge }   from "@/components/PriorityBadge";
 import { setTransferStatus } from "./actions/setTransferStatus";
+import { setOwnShift } from "@/lib/staffOwnShift";
+import { SHIFT_COLOR, SHIFT_LABEL } from "@/lib/shifts";
+import { getUserActionErrorMessage, showClientToast } from "@/lib/clientToast";
 
 /* ── types ── */
 type Celador = { id: string; firstName: string | null; lastName1: string | null; email: string } | null;
@@ -174,16 +177,34 @@ const STATUS_OPTS = [
   { value: "CANCELADO",  label: "Cancelado"  },
 ];
 
+const SHIFTS = [
+  { value: "MANANA" as const, label: "☀️ Mañana",  sub: "08–15h" },
+  { value: "TARDE"  as const, label: "🌆 Tarde",   sub: "15–22h" },
+  { value: "NOCHE"  as const, label: "🌙 Noche",   sub: "22–08h" },
+];
+
 export default function TecnicoClient() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [currentShift, setCurrentShift]   = useState<string | null>(null);
+  const [shiftOpen,    setShiftOpen]    = useState(false);
+  const [shiftPending, startShiftTransition] = useTransition();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchTransfers = async () => {
     const res = await fetch("/api/tecnico/transfers");
-    if (res.ok) setTransfers(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setTransfers(data);
+        setCurrentShift(null);
+      } else {
+        setTransfers(data.transfers ?? []);
+        setCurrentShift(data.currentShift ?? null);
+      }
+    }
     setLoading(false);
   };
 
@@ -212,22 +233,25 @@ export default function TecnicoClient() {
     setTimeout(fetchTransfers, 800);
   };
 
+  function handleShiftChange(shift: "MANANA" | "TARDE" | "NOCHE" | "OFF") {
+    startShiftTransition(async () => {
+      try {
+        await setOwnShift(shift);
+        setCurrentShift(shift === "OFF" ? null : shift);
+        setShiftOpen(false);
+      } catch (e) {
+        console.error(e);
+        showClientToast(getUserActionErrorMessage(e), "error");
+      }
+    });
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-gray-400 py-8">
         <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
         Cargando solicitudes...
       </div>
-    );
-  }
-
-  if (transfers.length === 0) {
-    return (
-      <EmptyState
-        title="No hay solicitudes activas"
-        subtitle="Usa el formulario para crear un nuevo traslado"
-        icon="🚑"
-      />
     );
   }
 
@@ -245,6 +269,76 @@ export default function TecnicoClient() {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-2">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tu turno</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {currentShift && (currentShift === "MANANA" || currentShift === "TARDE" || currentShift === "NOCHE") ? (
+              <span
+                className={`text-sm font-medium border rounded-lg px-3 py-2 ${
+                  SHIFT_COLOR[currentShift] ?? "bg-gray-50 text-gray-700 border-gray-200"
+                }`}
+              >
+                {SHIFT_LABEL[currentShift]}
+              </span>
+            ) : (
+              <span className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2">
+                Sin turno asignado
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setShiftOpen((v) => !v)}
+              disabled={shiftPending}
+              className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2 rounded-lg px-2 py-1 active:bg-gray-100 disabled:opacity-40"
+            >
+              {shiftPending ? "Guardando…" : "Cambiar turno"}
+            </button>
+          </div>
+        </div>
+        {shiftOpen && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs text-gray-500">Indica a qué turno perteneces (visible para administración).</p>
+            <div className="flex flex-wrap gap-2">
+              {SHIFTS.map(({ value, label, sub }) => (
+                <button
+                  type="button"
+                  key={value}
+                  disabled={shiftPending}
+                  onClick={() => handleShiftChange(value)}
+                  className={`flex-1 min-w-[90px] min-h-12 border rounded-lg px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-40 ${
+                    currentShift === value
+                      ? "bg-gray-900 text-white border-gray-900"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="block">{label}</span>
+                  <span className="block text-xs opacity-60">{sub}</span>
+                </button>
+              ))}
+              {currentShift && (
+                <button
+                  type="button"
+                  disabled={shiftPending}
+                  onClick={() => handleShiftChange("OFF")}
+                  className="inline-flex items-center justify-center min-h-11 border border-dashed border-gray-300 rounded-lg px-3 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Quitar turno
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {transfers.length === 0 ? (
+        <EmptyState
+          title="No hay solicitudes activas"
+          subtitle="Usa el formulario para crear un nuevo traslado"
+          icon="🚑"
+        />
+      ) : (
+        <>
       {/* ── Barra de filtros ── */}
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[180px]">
@@ -307,6 +401,8 @@ export default function TecnicoClient() {
       )}
 
       <p className="text-xs text-gray-300 text-right">Actualiza cada 15 s</p>
+        </>
+      )}
     </div>
   );
 }

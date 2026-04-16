@@ -14,8 +14,8 @@ async function requireAdmin() {
 }
 
 /**
- * Asigna un turno a un celador.
- * Resetea breakUsedAt para que pueda usar su descanso en el nuevo turno.
+ * Asigna un turno a un celador o técnico.
+ * Resetea breakUsedAt para que pueda usar su descanso en el nuevo turno (celadores).
  */
 export async function setShift(formData: FormData) {
   await requireAdmin();
@@ -24,6 +24,14 @@ export async function setShift(formData: FormData) {
   const shift  = String(formData.get("shift")  ?? "") as Shift | "OFF";
 
   if (!userId) throw new Error("Falta userId");
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (target?.role !== "CELADOR" && target?.role !== "TECNICO") {
+    throw new Error("El turno solo aplica a celadores o técnicos");
+  }
 
   await prisma.user.update({
     where: { id: userId },

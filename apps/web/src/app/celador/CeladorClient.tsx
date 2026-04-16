@@ -11,9 +11,9 @@ import {
   acceptTransfer,
   startBreak,
   endBreak,
-  setOwnShift,
   releaseTransferToPool,
 } from "./serverActions";
+import { setOwnShift } from "@/lib/staffOwnShift";
 
 import SignatureModal  from "@/components/SignatureModal";
 import {

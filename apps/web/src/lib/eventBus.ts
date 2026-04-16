@@ -5,7 +5,8 @@ export type MedflowEventType =
   | "transfer:assigned"
   | "transfer:released"
   | "transfer:status"
-  | "celador:break";
+  | "celador:break"
+  | "staff:shift";
 
 export interface MedflowEvent {
   type:        MedflowEventType;
@@ -15,6 +16,8 @@ export interface MedflowEvent {
   celadorId?:  string;
   /** ID del técnico destinatario */
   tecnicoId?:  string;
+  /** Quien cambió turno (celador o técnico) — para refrescar SSE */
+  staffUserId?: string;
   patientName?: string;
   mrn?:        string;
   location?:   string;

@@ -76,9 +76,9 @@ export default function UserRow({ user }: { user: User }) {
         {fDate(user.createdAt)}
       </td>
 
-      {/* Selector de turno — solo para celadores */}
+      {/* Selector de turno — celadores y técnicos */}
       <td className="px-4 py-3">
-        {user.role === "CELADOR" && user.active ? (
+        {(user.role === "CELADOR" || user.role === "TECNICO") && user.active ? (
           <ShiftSelector userId={user.id} currentShift={user.activeShift} />
         ) : (
           <span className="text-gray-200">—</span>
