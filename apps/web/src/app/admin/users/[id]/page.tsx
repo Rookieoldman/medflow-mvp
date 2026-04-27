@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updateUser } from "./actions";
 import { fDate } from "@/lib/format";
+import AdminResetPasswordForm from "./AdminResetPasswordForm";
 
 export const dynamic = "force-dynamic";
 
@@ -183,6 +184,19 @@ export default async function EditUserPage({
                     className="border rounded-lg px-3 py-2 w-full text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
                   />
                 </div>
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                  Si el usuario no recuerda su contraseña, usa el bloque siguiente para asignar una nueva.
+                  Comunícala por un canal seguro (nunca por email sin cifrar).
+                </p>
+              </section>
+
+              <hr />
+
+              <section className="space-y-3">
+                <h2 className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                  Restablecer contraseña
+                </h2>
+                <AdminResetPasswordForm userId={user.id} />
               </section>
 
               <hr />

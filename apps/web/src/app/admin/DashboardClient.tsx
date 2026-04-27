@@ -44,6 +44,7 @@ type Props = {
   slaPercent:      number;
   statusBreakdown: StatusEntry[];
   celadores:       CeladorEntry[];
+  serverNow:       number;
 };
 
 function InfoTooltip({ text }: { text: string }) {
@@ -111,8 +112,9 @@ export default function DashboardClient({
   slaPercent:      initialSla,
   statusBreakdown: initialBreakdown,
   celadores:       initialCeladores,
+  serverNow,
 }: Props) {
-  const [now,             setNow]             = useState(Date.now());
+  const [now,             setNow]             = useState(serverNow);
   const [transfers,       setTransfers]       = useState(initialTransfers);
   const [total,           setTotal]           = useState(initialTotal);
   const [statusBreakdown, setStatusBreakdown] = useState(initialBreakdown);

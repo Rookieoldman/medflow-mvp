@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import bcrypt from "bcryptjs";
+
+const PASSWORD_MIN_LEN = 8;
 
 const VALID_ROLES = ["TECNICO", "CELADOR", "ADMIN"] as const;
 type Role = (typeof VALID_ROLES)[number];
@@ -38,4 +41,55 @@ export async function updateUser(formData: FormData) {
 
   revalidatePath("/admin/users");
   redirect("/admin/users");
+}
+
+export type AdminResetPasswordState = {
+  error: string | null;
+  ok: boolean;
+};
+
+/** Admin asigna una nueva contraseña al usuario (p. ej. olvido). No requiere la antigua. */
+export async function adminResetUserPassword(
+  _prev: AdminResetPasswordState,
+  formData: FormData
+): Promise<AdminResetPasswordState> {
+  await requireAdmin();
+
+  const targetUserId = String(formData.get("userId") ?? "");
+  const next = String(formData.get("newPassword") ?? "");
+  const confirm = String(formData.get("confirmPassword") ?? "");
+
+  if (!targetUserId) {
+    return { error: "Falta identificador de usuario", ok: false };
+  }
+  if (!next || !confirm) {
+    return { error: "Indica la nueva contraseña y la confirmación", ok: false };
+  }
+  if (next.length < PASSWORD_MIN_LEN) {
+    return {
+      error: `La contraseña debe tener al menos ${PASSWORD_MIN_LEN} caracteres`,
+      ok: false,
+    };
+  }
+  if (next !== confirm) {
+    return { error: "La confirmación no coincide", ok: false };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true },
+  });
+  if (!user) {
+    return { error: "Usuario no encontrado", ok: false };
+  }
+
+  const hash = await bcrypt.hash(next, 10);
+  await prisma.user.update({
+    where: { id: targetUserId },
+    data: { password: hash },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${targetUserId}`);
+  return { error: null, ok: true };
 }

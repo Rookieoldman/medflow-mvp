@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,30 +35,42 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center">
+    <main className="min-h-screen flex items-center justify-center px-4 py-10">
       <form
         onSubmit={handleSubmit}
-        className="border rounded p-6 w-full max-w-sm space-y-4"
+        className="border border-gray-200 rounded-xl p-6 w-full max-w-sm space-y-4 bg-white shadow-sm"
       >
-        <h1 className="text-xl font-semibold text-center">MedFlow · Login</h1>
+        <h1 className="text-xl font-semibold text-center text-gray-900">MedFlow · Login</h1>
 
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="border p-2 w-full"
+          className="border border-gray-200 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
           required
+          autoComplete="username"
         />
 
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="border p-2 w-full"
-          required
-        />
+        <div className="space-y-1">
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border border-gray-200 rounded-lg p-2.5 w-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+            required
+            autoComplete="current-password"
+          />
+          <p className="text-right">
+            <Link
+              href="/login/forgot"
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              ¿Has olvidado tu contraseña?
+            </Link>
+          </p>
+        </div>
 
         {error && (
           <p className="text-sm text-red-600 text-center">{error}</p>
@@ -66,7 +79,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white w-full py-2 disabled:opacity-50"
+          className="bg-gray-900 text-white w-full py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
         >
           {loading ? "Entrando…" : "Entrar"}
         </button>

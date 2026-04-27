@@ -72,6 +72,7 @@ export default async function AdminDashboardPage() {
       slaPercent={slaPercent}
       statusBreakdown={statusBreakdown}
       celadores={celadorStatus}
+      serverNow={now.getTime()}
     />
   );
 }
