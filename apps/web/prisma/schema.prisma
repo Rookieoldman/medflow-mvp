@@ -33,6 +33,7 @@ model User {
   updatedAt           DateTime             @updatedAt
   transferAcceptances TransferAcceptance[]
   passwordResetTokens PasswordResetToken[]
+  shiftChangeLogs     ShiftChangeLog[]
 }
 
 /** Token de un solo uso para recuperación de contraseña (hash del secreto en URL). */
@@ -181,4 +182,19 @@ enum Shift {
   MANANA
   TARDE
   NOCHE
+}
+
+/** Registro de cada cambio de turno: quién lo hizo, desde dónde y cuándo. */
+model ShiftChangeLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromShift     Shift?
+  toShift       Shift?
+  changedAt     DateTime @default(now())
+  changedByRole String   // "SELF" | "ADMIN"
+  changedByName String
+
+  @@index([userId])
+  @@index([changedAt])
 }

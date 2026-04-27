@@ -19,6 +19,7 @@ services:
       NEXTAUTH_SECRET: super-secret-medflow-dev
       NEXTAUTH_URL: http://localhost:3000
       AUTH_TRUST_HOST: true
+      TZ: Europe/Madrid
     ports:
       - "3000:3000"
     depends_on:

@@ -29,9 +29,10 @@ function getShiftFromTime(now: number): string {
   return "NOCHE";
 }
 
-type CeladorEntry = {
+type StaffEntry = {
   id:          string;
   name:        string;
+  role:        string;
   onBreak:     boolean;
   breakUntil:  string | null;
   activeShift: string | null;
@@ -43,8 +44,9 @@ type Props = {
   riskCount:       number;
   slaPercent:      number;
   statusBreakdown: StatusEntry[];
-  celadores:       CeladorEntry[];
+  staff:           StaffEntry[];
   serverNow:       number;
+  currentShift:    string;
 };
 
 function InfoTooltip({ text }: { text: string }) {
@@ -111,14 +113,16 @@ export default function DashboardClient({
   riskCount:       initialRiskCount,
   slaPercent:      initialSla,
   statusBreakdown: initialBreakdown,
-  celadores:       initialCeladores,
+  staff:           initialStaff,
   serverNow,
+  currentShift:    initialShift,
 }: Props) {
   const [now,             setNow]             = useState(serverNow);
+  const [displayShift,    setDisplayShift]    = useState(initialShift);
   const [transfers,       setTransfers]       = useState(initialTransfers);
   const [total,           setTotal]           = useState(initialTotal);
   const [statusBreakdown, setStatusBreakdown] = useState(initialBreakdown);
-  const [celadores,       setCeladores]       = useState<CeladorEntry[]>(initialCeladores);
+  const [staff,           setStaff]           = useState<StaffEntry[]>(initialStaff);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   void initialRiskCount;
@@ -132,14 +136,18 @@ export default function DashboardClient({
       setTransfers(data.transfers);
       setTotal(data.total);
       setStatusBreakdown(data.statusBreakdown);
-      setCeladores(data.celadores);
+      setStaff(data.staff);
       setNow(Date.now());
     } catch { /* ignorar */ }
   };
 
   useEffect(() => {
     // Reloj interno cada 10 s (para SLA countdown)
-    const clock = setInterval(() => setNow(Date.now()), 10_000);
+    const clock = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      setDisplayShift(getShiftFromTime(t));
+    }, 10_000);
 
     // Polling completo cada 30 s
     pollRef.current = setInterval(fetchDashboard, 30_000);
@@ -159,6 +167,9 @@ export default function DashboardClient({
       es.close();
     };
   }, []);
+
+  const celadores = useMemo(() => staff.filter((s) => s.role === "CELADOR"), [staff]);
+  const tecnicos  = useMemo(() => staff.filter((s) => s.role === "TECNICO"),  [staff]);
 
   const liveRiskList = useMemo(
     () => transfers.filter((t) => getSLAInfo(t, now).risk),
@@ -198,49 +209,92 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* ── DISPONIBILIDAD CELADORES ── */}
-      {celadores.length > 0 && (
+      {/* ── PERSONAL EN TURNO ── */}
+      {staff.length > 0 && (
         <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {SHIFT_LABEL[getShiftFromTime(now)]}
+              Personal en turno · {SHIFT_LABEL[displayShift]}
             </h2>
             <span className="text-xs text-gray-400">
-              {celadores.filter((c) => !(c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now))).length}
-              &nbsp;/&nbsp;{celadores.length} en turno
+              {staff.filter((s) => !(s.onBreak && s.breakUntil && new Date(s.breakUntil) > new Date(now))).length}
+              &nbsp;/&nbsp;{staff.length} disponibles
             </span>
           </div>
-          {celadores.length === 0 && (
+
+          {/* Celadores */}
+          {celadores.length > 0 && (
+            <>
+              <div className="px-5 py-2 bg-gray-50 border-b border-gray-100">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Celadores ({celadores.length})
+                </span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {celadores.map((c) => {
+                  const isOnBreak = c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now);
+                  const secsLeft  = isOnBreak
+                    ? Math.max(0, Math.floor((new Date(c.breakUntil!).getTime() - now) / 1000))
+                    : 0;
+                  const mm = Math.floor(secsLeft / 60).toString().padStart(2, "0");
+                  const ss = (secsLeft % 60).toString().padStart(2, "0");
+                  return (
+                    <div key={c.id} className="flex items-center justify-between px-5 py-2.5 gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOnBreak ? "bg-amber-400" : "bg-green-500"}`} />
+                        <span className="text-sm text-gray-800 font-medium truncate">{c.name}</span>
+                      </div>
+                      {isOnBreak ? (
+                        <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">☕ {mm}:{ss}</span>
+                      ) : (
+                        <span className="text-xs text-green-600 font-medium shrink-0">Disponible</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Técnicos */}
+          {tecnicos.length > 0 && (
+            <>
+              <div className="px-5 py-2 bg-gray-50 border-y border-gray-100">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Técnicos ({tecnicos.length})
+                </span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {tecnicos.map((t) => {
+                  const isOnBreak = t.onBreak && t.breakUntil && new Date(t.breakUntil) > new Date(now);
+                  const secsLeft  = isOnBreak
+                    ? Math.max(0, Math.floor((new Date(t.breakUntil!).getTime() - now) / 1000))
+                    : 0;
+                  const mm = Math.floor(secsLeft / 60).toString().padStart(2, "0");
+                  const ss = (secsLeft % 60).toString().padStart(2, "0");
+                  return (
+                    <div key={t.id} className="flex items-center justify-between px-5 py-2.5 gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOnBreak ? "bg-amber-400" : "bg-green-500"}`} />
+                        <span className="text-sm text-gray-800 font-medium truncate">{t.name}</span>
+                      </div>
+                      {isOnBreak ? (
+                        <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">☕ {mm}:{ss}</span>
+                      ) : (
+                        <span className="text-xs text-green-600 font-medium shrink-0">Disponible</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {celadores.length === 0 && tecnicos.length === 0 && (
             <p className="px-5 py-4 text-xs text-gray-400 italic">
-              Ningún celador tiene asignado este turno. Actualízalo desde Usuarios.
+              Ningún empleado tiene asignado este turno. Actualízalo desde Usuarios.
             </p>
           )}
-          <div className="divide-y divide-gray-50">
-            {celadores.map((c) => {
-              const isOnBreak = c.onBreak && c.breakUntil && new Date(c.breakUntil) > new Date(now);
-              const secsLeft  = isOnBreak
-                ? Math.max(0, Math.floor((new Date(c.breakUntil!).getTime() - now) / 1000))
-                : 0;
-              const mm = Math.floor(secsLeft / 60).toString().padStart(2, "0");
-              const ss = (secsLeft % 60).toString().padStart(2, "0");
-
-              return (
-                <div key={c.id} className="flex items-center justify-between px-5 py-2.5 gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isOnBreak ? "bg-amber-400" : "bg-green-500"}`} />
-                    <span className="text-sm text-gray-800 font-medium truncate">{c.name}</span>
-                  </div>
-                  {isOnBreak ? (
-                    <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">
-                      ☕ {mm}:{ss}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-green-600 font-medium shrink-0">Disponible</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 
@@ -344,7 +398,7 @@ export default function DashboardClient({
       {/* ── LISTADO ACTIVOS ── */}
       <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden overflow-x-auto">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Traslados activos hoy</h2>
+          <h2 className="font-semibold text-gray-800">Traslados activos</h2>
           <span className="text-xs text-gray-400">En tiempo real · refresca c/30 s</span>
         </div>
 
@@ -353,7 +407,7 @@ export default function DashboardClient({
             <span className="text-4xl">✓</span>
             <p className="font-medium text-gray-700">No hay traslados activos</p>
             <p className="text-sm text-gray-400">
-              Todos los traslados de hoy están finalizados
+              No hay traslados activos en este momento
             </p>
           </div>
         ) : (

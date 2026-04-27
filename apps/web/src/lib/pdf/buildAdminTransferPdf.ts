@@ -1,4 +1,10 @@
-import PDFDocument from "pdfkit";
+import { createRequire } from "node:module";
+import path from "node:path";
+
+// require dinámico para que Turbopack no intente resolver pdfkit en el grafo estático
+const requireFromRoot = createRequire(path.join(process.cwd(), "package.json"));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PDFDocument = requireFromRoot("pdf" + "kit") as any;
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 

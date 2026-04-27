@@ -1,24 +1,26 @@
 "use server";
 
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Shift } from "@prisma/client";
-import { emitTransferEvent } from "@/lib/eventBus";
-import type { ShiftName } from "@/lib/shifts";
 
-/** Celador o técnico: actualiza su turno declarado (misma lógica que antes solo para celador). */
-export async function setOwnShift(shift: ShiftName | "OFF") {
+const VALID_SHIFTS: Array<Shift | "OFF"> = ["MANANA", "TARDE", "NOCHE", "OFF"];
+
+export async function selfChangeShift(formData: FormData) {
   const session = await getServerSession(authOptions);
   const user    = session?.user as any;
-  const userId  = user?.id;
-  if (!userId || (user?.role !== "CELADOR" && user?.role !== "TECNICO")) {
+
+  if (!user?.id || (user.role !== "CELADOR" && user.role !== "TECNICO")) {
     throw new Error("No autorizado");
   }
 
+  const shift = String(formData.get("shift") ?? "") as Shift | "OFF";
+  if (!VALID_SHIFTS.includes(shift)) throw new Error("Turno no válido");
+
   const current = await prisma.user.findUnique({
-    where:  { id: userId },
+    where:  { id: user.id },
     select: { activeShift: true },
   });
 
@@ -26,8 +28,8 @@ export async function setOwnShift(shift: ShiftName | "OFF") {
 
   await prisma.$transaction([
     prisma.user.update({
-      where: { id: userId },
-      data: {
+      where: { id: user.id },
+      data:  {
         activeShift: newShift,
         breakUsedAt: newShift === null ? undefined : null,
         breakUntil:  newShift === null ? null : undefined,
@@ -35,7 +37,7 @@ export async function setOwnShift(shift: ShiftName | "OFF") {
     }),
     prisma.shiftChangeLog.create({
       data: {
-        userId,
+        userId:        user.id,
         fromShift:     current?.activeShift ?? null,
         toShift:       newShift,
         changedByRole: "SELF",
@@ -46,9 +48,7 @@ export async function setOwnShift(shift: ShiftName | "OFF") {
     }),
   ]);
 
-  emitTransferEvent({ type: "staff:shift", staffUserId: userId });
   revalidatePath("/celador");
   revalidatePath("/tecnico");
   revalidatePath("/admin");
-  revalidatePath("/admin/users");
 }

@@ -10,18 +10,23 @@ const ACTIVE_STATUSES = ["SOLICITADO", "ASIGNADO", "EN_CURSO", "EN_PRUEBA", "PAU
 
 export default async function AdminDashboardPage() {
   const now          = new Date();
-  const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const currentShift = getShift(now);
 
-  const celadores = await prisma.user.findMany({
-    where:   { role: "CELADOR", active: true, activeShift: currentShift },
-    select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
-    orderBy: { firstName: "asc" },
-  });
+  const [celadores, tecnicos] = await Promise.all([
+    prisma.user.findMany({
+      where:   { role: "CELADOR", active: true, activeShift: currentShift },
+      select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
+      orderBy: { firstName: "asc" },
+    }),
+    prisma.user.findMany({
+      where:   { role: "TECNICO", active: true, activeShift: currentShift },
+      select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
+      orderBy: { firstName: "asc" },
+    }),
+  ]);
 
   const raw = await prisma.transfer.findMany({
     where: {
-      createdAt: { gte: todayStart },
       status: { notIn: ["FINALIZADO", "CANCELADO"] },
     },
     select: {
@@ -56,13 +61,19 @@ export default async function AdminDashboardPage() {
     count: transfers.filter((t) => t.status === s).length,
   }));
 
-  const celadorStatus = celadores.map((c) => ({
-    id:          c.id,
-    name:        [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
-    onBreak:     !!(c.breakUntil && c.breakUntil > now),
-    breakUntil:  c.breakUntil?.toISOString() ?? null,
-    activeShift: c.activeShift ?? null,
-  }));
+  const toStaff = (role: string) => (u: typeof celadores[number]) => ({
+    id:          u.id,
+    name:        [u.firstName, u.lastName1].filter(Boolean).join(" ") || u.email,
+    role,
+    onBreak:     !!(u.breakUntil && u.breakUntil > now),
+    breakUntil:  u.breakUntil?.toISOString() ?? null,
+    activeShift: u.activeShift ?? null,
+  });
+
+  const staff = [
+    ...celadores.map(toStaff("CELADOR")),
+    ...tecnicos.map(toStaff("TECNICO")),
+  ];
 
   return (
     <DashboardClient
@@ -71,8 +82,9 @@ export default async function AdminDashboardPage() {
       riskCount={riskCount}
       slaPercent={slaPercent}
       statusBreakdown={statusBreakdown}
-      celadores={celadorStatus}
+      staff={staff}
       serverNow={now.getTime()}
+      currentShift={currentShift}
     />
   );
 }

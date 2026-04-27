@@ -16,14 +16,14 @@ export async function GET() {
   }
 
   const now          = new Date();
-  const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const currentShift = getShift(now);
 
-  const [rawTransfers, celadores] = await Promise.all([
+  const staffSelect = { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true } as const;
+
+  const [rawTransfers, celadores, tecnicos] = await Promise.all([
     prisma.transfer.findMany({
       where: {
-        createdAt: { gte: todayStart },
-        status:    { notIn: ["FINALIZADO", "CANCELADO"] },
+        status: { notIn: ["FINALIZADO", "CANCELADO"] },
       },
       select: {
         id:              true,
@@ -39,7 +39,12 @@ export async function GET() {
     }),
     prisma.user.findMany({
       where:   { role: "CELADOR", active: true, activeShift: currentShift },
-      select:  { id: true, firstName: true, lastName1: true, email: true, breakUntil: true, activeShift: true },
+      select:  staffSelect,
+      orderBy: { firstName: "asc" },
+    }),
+    prisma.user.findMany({
+      where:   { role: "TECNICO", active: true, activeShift: currentShift },
+      select:  staffSelect,
       orderBy: { firstName: "asc" },
     }),
   ]);
@@ -63,13 +68,19 @@ export async function GET() {
     count:  transfers.filter((t) => t.status === s).length,
   }));
 
-  const celadorStatus = celadores.map((c) => ({
-    id:          c.id,
-    name:        [c.firstName, c.lastName1].filter(Boolean).join(" ") || c.email,
-    onBreak:     !!(c.breakUntil && c.breakUntil > now),
-    breakUntil:  c.breakUntil?.toISOString() ?? null,
-    activeShift: c.activeShift ?? null,
-  }));
+  const toStaff = (role: string) => (u: typeof celadores[number]) => ({
+    id:          u.id,
+    name:        [u.firstName, u.lastName1].filter(Boolean).join(" ") || u.email,
+    role,
+    onBreak:     !!(u.breakUntil && u.breakUntil > now),
+    breakUntil:  u.breakUntil?.toISOString() ?? null,
+    activeShift: u.activeShift ?? null,
+  });
 
-  return NextResponse.json({ transfers, total, riskCount, slaPercent, statusBreakdown, celadores: celadorStatus });
+  const staff = [
+    ...celadores.map(toStaff("CELADOR")),
+    ...tecnicos.map(toStaff("TECNICO")),
+  ];
+
+  return NextResponse.json({ transfers, total, riskCount, slaPercent, statusBreakdown, staff });
 }

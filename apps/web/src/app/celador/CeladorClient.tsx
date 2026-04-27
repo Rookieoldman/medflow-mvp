@@ -408,62 +408,63 @@ export default function CeladorClient() {
       {/* ════════════════════════════════════════
           TURNO ACTIVO
       ════════════════════════════════════════ */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {currentShift ? (
-            <span className={`text-sm font-medium border rounded-lg px-3 py-2 ${SHIFT_COLOR[currentShift] ?? ""}`}>
-              {SHIFT_LABEL[currentShift] ?? currentShift}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2">
-              Sin turno asignado
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setShiftOpen((v) => !v)}
-            disabled={shiftPending}
-            className="inline-flex items-center justify-center min-h-11 px-2 -mx-1 text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2 rounded-lg active:bg-gray-100 disabled:opacity-40"
-          >
-            {shiftPending ? "Guardando…" : "Cambiar turno"}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Selector de turno ── */}
-      {shiftOpen && (
-        <div className="border border-gray-200 rounded-xl bg-white shadow-sm p-3 space-y-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Selecciona tu turno</p>
-          <div className="flex flex-wrap gap-2">
-            {SHIFTS.map(({ value, label, sub }) => (
-              <button
-                type="button"
-                key={value}
-                disabled={shiftPending}
-                onClick={() => handleShiftChange(value)}
-                className={`flex-1 min-w-[90px] min-h-12 border rounded-lg px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-40 ${
-                  currentShift === value
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <span className="block">{label}</span>
-                <span className="block text-xs opacity-60">{sub}</span>
-              </button>
-            ))}
-            {currentShift && (
-              <button
-                type="button"
-                disabled={shiftPending}
-                onClick={() => handleShiftChange("OFF")}
-                className="inline-flex items-center justify-center min-h-11 border border-dashed border-gray-300 rounded-lg px-3 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-              >
-                Quitar turno
-              </button>
+      <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm space-y-2">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tu turno</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {currentShift ? (
+              <span className={`text-sm font-medium border rounded-lg px-3 py-2 ${SHIFT_COLOR[currentShift] ?? ""}`}>
+                {SHIFT_LABEL[currentShift] ?? currentShift}
+              </span>
+            ) : (
+              <span className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2">
+                Sin turno asignado
+              </span>
             )}
+            <button
+              type="button"
+              onClick={() => setShiftOpen((v) => !v)}
+              disabled={shiftPending}
+              className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2 rounded-lg px-2 py-1 active:bg-gray-100 disabled:opacity-40"
+            >
+              {shiftPending ? "Guardando…" : "Cambiar turno"}
+            </button>
           </div>
         </div>
-      )}
+        {shiftOpen && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs text-gray-500">Indica a qué turno perteneces (visible para administración).</p>
+            <div className="flex flex-wrap gap-2">
+              {SHIFTS.map(({ value, label, sub }) => (
+                <button
+                  type="button"
+                  key={value}
+                  disabled={shiftPending}
+                  onClick={() => handleShiftChange(value)}
+                  className={`flex-1 min-w-[90px] min-h-12 border rounded-lg px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-40 ${
+                    currentShift === value
+                      ? "bg-gray-900 text-white border-gray-900"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="block">{label}</span>
+                  <span className="block text-xs opacity-60">{sub}</span>
+                </button>
+              ))}
+              {currentShift && (
+                <button
+                  type="button"
+                  disabled={shiftPending}
+                  onClick={() => handleShiftChange("OFF")}
+                  className="inline-flex items-center justify-center min-h-11 border border-dashed border-gray-300 rounded-lg px-3 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Quitar turno
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ════════════════════════════════════════
           ESTADO DE DESCANSO

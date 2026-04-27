@@ -25,7 +25,7 @@ export default async function AdminUsersPage({
 
   const where = activeRole ? { role: activeRole as any } : undefined;
 
-  const [total, users, roleCounts] = await Promise.all([
+  const [total, users, roleCounts, recentShiftLogs] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
@@ -39,6 +39,11 @@ export default async function AdminUsersPage({
       },
     }),
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
+    prisma.shiftChangeLog.findMany({
+      orderBy: { changedAt: "desc" },
+      take:    20,
+      include: { user: { select: { firstName: true, lastName1: true, email: true, role: true } } },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -137,6 +142,63 @@ export default async function AdminUsersPage({
             buildHref={buildHref}
           />
         </>
+      )}
+      {/* ── CAMBIOS DE TURNO RECIENTES ── */}
+      {recentShiftLogs.length > 0 && (
+        <div className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Cambios de turno recientes
+            </h2>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {recentShiftLogs.map((log) => {
+              const SHIFT_LABEL: Record<string, string> = {
+                MANANA: "☀️ Mañana",
+                TARDE:  "🌆 Tarde",
+                NOCHE:  "🌙 Noche",
+              };
+              const ROLE_LABEL: Record<string, string> = {
+                CELADOR: "Celador",
+                TECNICO: "Técnico",
+                ADMIN:   "Admin",
+              };
+              const from = log.fromShift ? (SHIFT_LABEL[log.fromShift] ?? log.fromShift) : "Fuera de turno";
+              const to   = log.toShift   ? (SHIFT_LABEL[log.toShift]   ?? log.toShift)   : "Fuera de turno";
+              const name = [log.user.firstName, log.user.lastName1].filter(Boolean).join(" ") || log.user.email;
+              const isSelf = log.changedByRole === "SELF";
+              return (
+                <div key={log.id} className="flex items-center justify-between px-5 py-2.5 gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">{isSelf ? "🙋" : "👤"}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {name}
+                        <span className="ml-1.5 text-xs font-normal text-gray-400">
+                          {ROLE_LABEL[log.user.role] ?? log.user.role}
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        <span>{from}</span>
+                        {" → "}
+                        <span className="font-medium text-gray-700">{to}</span>
+                        {!isSelf && (
+                          <span className="ml-1.5 text-gray-400">· por admin</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <time className="text-xs text-gray-400 shrink-0 tabular-nums">
+                    {new Date(log.changedAt).toLocaleString("es-ES", {
+                      day: "2-digit", month: "2-digit",
+                      hour: "2-digit", minute: "2-digit",
+                    })}
+                  </time>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </section>
   );

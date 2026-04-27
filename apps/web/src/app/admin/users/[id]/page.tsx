@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { updateUser } from "./actions";
 import { fDate } from "@/lib/format";
 import AdminResetPasswordForm from "./AdminResetPasswordForm";
+import ShiftSelector from "../ShiftSelector";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,17 @@ export default async function EditUserPage({
 
   if (!id) return <p className="p-6 text-sm text-gray-500">Falta id de usuario.</p>;
 
-  const user = await prisma.user.findUnique({ where: { id } });
+  const [userRecord, shiftLogs] = await Promise.all([
+    prisma.user.findUnique({ where: { id } }),
+    prisma.shiftChangeLog.findMany({
+      where:   { userId: id },
+      orderBy: { changedAt: "desc" },
+      take:    30,
+    }),
+  ]);
 
-  if (!user) return <p className="p-6 text-sm text-gray-500">Usuario no encontrado.</p>;
+  if (!userRecord) return <p className="p-6 text-sm text-gray-500">Usuario no encontrado.</p>;
+  const user = userRecord;
 
   const roleConfig = ROLE_CONFIG[user.role] ?? {
     label: user.role,
@@ -113,11 +122,21 @@ export default async function EditUserPage({
                 </span>
               )}
             </div>
+
+            {(user.role === "CELADOR" || user.role === "TECNICO") && (
+              <>
+                <hr />
+                <div className="space-y-1.5">
+                  <span className="text-xs text-gray-500">Turno activo</span>
+                  <ShiftSelector userId={user.id} currentShift={user.activeShift ?? null} />
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
-        {/* ── COLUMNA DERECHA: formulario ── */}
-        <div className="flex-1 min-w-0">
+        {/* ── COLUMNA DERECHA: formulario + historial ── */}
+        <div className="flex-1 min-w-0 space-y-5">
           <form action={updateUser} className="border rounded-xl bg-white shadow-sm overflow-hidden">
             <input type="hidden" name="id" value={user.id} />
 
@@ -253,6 +272,57 @@ export default async function EditUserPage({
               </Link>
             </div>
           </form>
+
+          {/* ── HISTORIAL DE TURNOS ── */}
+          {shiftLogs.length > 0 && (
+            <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="font-semibold text-gray-900">Historial de cambios de turno</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Últimos {shiftLogs.length} registros</p>
+              </div>
+              <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                {shiftLogs.map((log) => {
+                  const SHIFT_LABEL: Record<string, string> = {
+                    MANANA: "☀️ Mañana",
+                    TARDE:  "🌆 Tarde",
+                    NOCHE:  "🌙 Noche",
+                  };
+                  const from = log.fromShift ? (SHIFT_LABEL[log.fromShift] ?? log.fromShift) : "Fuera de turno";
+                  const to   = log.toShift   ? (SHIFT_LABEL[log.toShift]   ?? log.toShift)   : "Fuera de turno";
+                  const isAdmin = log.changedByRole === "ADMIN";
+                  return (
+                    <div key={log.id} className="flex items-start justify-between px-6 py-3 gap-4 text-sm">
+                      <div className="min-w-0">
+                        <p className="text-gray-800">
+                          <span className="text-gray-400">{from}</span>
+                          {" → "}
+                          <span className="font-medium">{to}</span>
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {isAdmin ? "👤 Admin · " : "🙋 Autoservicio · "}
+                          {log.changedByName}
+                        </p>
+                      </div>
+                      <time className="text-xs text-gray-400 shrink-0 tabular-nums">
+                        {new Date(log.changedAt).toLocaleString("es-ES", {
+                          day: "2-digit", month: "2-digit", year: "2-digit",
+                          hour: "2-digit", minute: "2-digit",
+                        })}
+                      </time>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {shiftLogs.length === 0 && (user.role === "CELADOR" || user.role === "TECNICO") && (
+            <div className="border rounded-xl bg-white shadow-sm px-6 py-5">
+              <h2 className="font-semibold text-gray-900 mb-1">Historial de cambios de turno</h2>
+              <p className="text-sm text-gray-400 italic">Sin cambios registrados todavía.</p>
+            </div>
+          )}
+
         </div>
 
       </div>
