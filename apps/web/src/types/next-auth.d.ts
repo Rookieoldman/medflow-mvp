@@ -8,6 +8,8 @@ declare module "next-auth" {
       firstName?: string | null;
       lastName1?: string | null;
       lastName2?: string | null;
+      medhubOrganizationId?:   string | null;
+      medhubOrganizationName?: string | null;
     } & DefaultSession["user"];
   }
 
@@ -17,6 +19,8 @@ declare module "next-auth" {
     firstName?: string | null;
     lastName1?: string | null;
     lastName2?: string | null;
+    medhubOrganizationId?:   string | null;
+    medhubOrganizationName?: string | null;
   }
 }
 
@@ -27,5 +31,7 @@ declare module "next-auth/jwt" {
     firstName?: string | null;
     lastName1?: string | null;
     lastName2?: string | null;
+    medhubOrganizationId?:   string | null;
+    medhubOrganizationName?: string | null;
   }
 }

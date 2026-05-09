@@ -15,6 +15,7 @@ export type MedhubSsoPayload = {
   email: string;
   role: string;
   organizationId: string;
+  organizationName: string;
   appId: string;
 };
 
@@ -31,6 +32,7 @@ export async function verifyMedhubSsoToken(
     const email = payload.email as string | undefined;
     const role = payload.role as string | undefined;
     const organizationId = payload.organizationId as string | undefined;
+    const organizationName = payload.organizationName as string | undefined;
     const appId = payload.appId as string | undefined;
     if (!sub || !email || !role || !organizationId || !appId) return null;
     if (appId !== EXPECTED_APP_ID) return null;
@@ -40,6 +42,8 @@ export async function verifyMedhubSsoToken(
       email: email.toLowerCase(),
       role,
       organizationId,
+      organizationName:
+        typeof organizationName === "string" ? organizationName : "",
       appId,
     };
   } catch {
@@ -54,6 +58,8 @@ export async function verifyMedhubSsoToken(
 export function mapMedhubRoleToMedflow(hubRole: string): Role {
   switch (hubRole) {
     case "ORG_ADMIN":
+    case "ORG_COORDINATOR":
+    case "JEFE_SERVICIO":
       return "ADMIN";
     case "CELADOR":
       return "CELADOR";

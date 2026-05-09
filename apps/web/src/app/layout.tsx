@@ -40,7 +40,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  const user    = session?.user as any;
+  const user    = session?.user;
+
+  const orgLabel = user?.medhubOrganizationName?.trim() ?? "";
 
   return (
     <html lang="es">
@@ -57,6 +59,13 @@ export default async function RootLayout({
             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <span className="text-base font-bold text-gray-900 tracking-tight shrink-0">
                 MedFlow
+                {orgLabel ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span className="font-semibold text-gray-700">{orgLabel}</span>
+                  </>
+                ) : null}
               </span>
               <span className="hidden sm:inline text-gray-300 shrink-0">|</span>
               <span className="min-w-0 truncate text-sm text-gray-600 sm:text-gray-500">

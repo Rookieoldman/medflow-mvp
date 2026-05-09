@@ -125,6 +125,8 @@ export const authOptions: NextAuthOptions = {
               firstName: user.firstName,
               lastName1: user.lastName1,
               lastName2: user.lastName2,
+              medhubOrganizationId: payload.organizationId,
+              medhubOrganizationName: payload.organizationName,
             };
           } catch (e) {
             const detail =
@@ -149,6 +151,15 @@ export const authOptions: NextAuthOptions = {
         token.firstName = (user as { firstName?: string | null }).firstName;
         token.lastName1 = (user as { lastName1?: string | null }).lastName1;
         token.lastName2 = (user as { lastName2?: string | null }).lastName2;
+
+        const ext = user as {
+          medhubOrganizationId?: string;
+          medhubOrganizationName?: string;
+        };
+        if (ext.medhubOrganizationId) {
+          token.medhubOrganizationId = ext.medhubOrganizationId;
+          token.medhubOrganizationName = ext.medhubOrganizationName ?? "";
+        }
       }
       return token;
     },
@@ -160,6 +171,11 @@ export const authOptions: NextAuthOptions = {
         session.user.firstName = token.firstName as string;
         session.user.lastName1 = token.lastName1 as string;
         session.user.lastName2 = token.lastName2 as string;
+
+        session.user.medhubOrganizationId =
+          (token.medhubOrganizationId as string | null | undefined) ?? null;
+        session.user.medhubOrganizationName =
+          (token.medhubOrganizationName as string | null | undefined) ?? null;
 
         session.user.name = [
           token.firstName,
