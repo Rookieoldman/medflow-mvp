@@ -1,9 +1,11 @@
+/**
+ * Prisma CLI / scripts: si el shell exporta `DATABASE_URL`, Next pot ignorar el `.env`
+ * del paquet. Importar aquest mòdul abans de `PrismaClient` aplica `.env` i `.env.local`.
+ */
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { defineConfig, env } from "prisma/config";
 
-/** Evita que `DATABASE_URL` del shell (p. ex. MEDHUB) sobreescriu el `.env` d’aquest paquet. */
-function loadProjectEnvFiles() {
+export function loadRootEnvFiles(): void {
   for (const name of [".env", ".env.local"] as const) {
     const p = resolve(process.cwd(), name);
     if (!existsSync(p)) continue;
@@ -26,14 +28,4 @@ function loadProjectEnvFiles() {
   }
 }
 
-loadProjectEnvFiles();
-
-export default defineConfig({
-  schema: "prisma/schema.prisma",
-  migrations: {
-    path: "prisma/migrations",
-  },
-  datasource: {
-    url: env("DATABASE_URL"),
-  },
-});
+loadRootEnvFiles();
